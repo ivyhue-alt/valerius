@@ -237,8 +237,9 @@ def check(msg: Message, policy: PolicyCard | None = None) -> Assessment:
     if msg.channel == Channel.BUSINESS:
         biz, incomplete = _business_rules(msg, policy)
         findings += biz
-    if msg.kind in ("image", "audio", "document") and not msg.text.strip():
-        incomplete.append(f"{msg.kind} not yet read (no text extracted)")
+    if msg.kind in ("image", "audio", "document"):
+        # A caption is not the content. Until SAM or transcription has read the media, it is unverified.
+        incomplete.append(f"{msg.kind} not yet read")
     floor = max((f.risk for f in findings), default=Risk.LOW)
     return Assessment(floor=floor, findings=findings, incomplete=incomplete)
 

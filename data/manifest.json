@@ -1,0 +1,11 @@
+{
+  "pool_sha256": "37df7f8dc2b2af3ae226d5d5bc00f6a1c64feff7111ca936456d2c4a55b47589",
+  "seed": 61433057231538,
+  "pool_rows": 144,
+  "drawn": 100,
+  "positive": 50,
+  "negative": 50,
+  "dev": 30,
+  "test": 70,
+  "rule": "Never tune rules or prompts on rows with split=test."
+}
