@@ -82,7 +82,7 @@ class Verdict:
 ChatFn = Callable[[list[dict[str, str]]], llm.Reply]
 
 
-def _context(msg: Message, a: Assessment) -> str:
+def _context(msg: Message, a: Assessment, include_rules: bool = True) -> str:
     parts = [f"Channel: {'business conversation with an AI agent' if msg.channel == 'business' else 'forwarded to Valerius Family by a person asking if it is safe'}"]
     if msg.kind != "text":
         parts.append(f"Message type: {msg.kind}" + (" (forwarded)" if msg.forwarded else ""))
@@ -97,10 +97,10 @@ def _context(msg: Message, a: Assessment) -> str:
             parts.append("Order record: " + json.dumps(rec))
         else:
             parts.append("Order record: none available")
-    if a.findings:
+    if include_rules and a.findings:
         parts.append("Deterministic rule findings (already certain, you cannot remove them): " +
                      "; ".join(f"{f.rule}={f.risk.name}" for f in a.findings))
-    if a.incomplete:
+    if include_rules and a.incomplete:
         parts.append("Checks that could not run: " + "; ".join(a.incomplete))
     return "\n".join(parts)
 
@@ -149,10 +149,27 @@ def default_judge_chat(messages: list[dict[str, str]]) -> llm.Reply:
                     extra={"temperature": 0})
 
 
+VERDICT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "risk": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]},
+        "category": {"type": "string"},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+        "quotes": {"type": "array", "items": {"type": "string"}},
+        "advice": {"type": "string"},
+    },
+    "required": ["risk", "category", "reasons", "quotes", "advice"],
+    "additionalProperties": False,
+}
+
+
 def default_second_chat(messages: list[dict[str, str]]) -> llm.Reply:
     # Muse Spark Open always reasons; "low" keeps it fast. The answer is read from `content` only.
+    # Baseten enforces the JSON schema, so the reply always has the same shape as the first verdict.
     return llm.chat(SETTINGS.baseten_base_url, SETTINGS.baseten_api_key, SETTINGS.second_pass_model, messages,
-                    extra={"reasoning_effort": "low", "max_tokens": 4000})
+                    extra={"reasoning_effort": "low", "max_tokens": 4000,
+                           "response_format": {"type": "json_schema",
+                                               "json_schema": {"name": "verdict", "schema": VERDICT_SCHEMA, "strict": True}}})
 
 
 def judge(msg: Message, a: Assessment, chat: ChatFn | None = None) -> Verdict:
@@ -164,10 +181,11 @@ def judge(msg: Message, a: Assessment, chat: ChatFn | None = None) -> Verdict:
 
 def second_pass(msg: Message, a: Assessment, first: Verdict, chat: ChatFn | None = None) -> Verdict:
     chat = chat or default_second_chat
+    # Judged blind to the rule findings, so it argues from the message itself, not from our rules.
     first_summary = (f"First reviewer said {first.risk.name}: " + "; ".join(first.reasons)) if first.ok \
         else "First reviewer could not give a verdict."
     messages = [{"role": "system", "content": SECOND_SYSTEM},
-                {"role": "user", "content": _context(msg, a) + "\n" + first_summary +
+                {"role": "user", "content": _context(msg, a, include_rules=False) + "\n" + first_summary +
                  "\n\nMessage to review:\n" + _wrap(msg.text)}]
     return _from_reply(chat(messages), msg.text, "muse-spark-open")
 

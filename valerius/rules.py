@@ -55,7 +55,7 @@ def _days_between(a: str, b: str) -> int | None:
 
 MONEY_ASK = [r"\bsend (?:me |us )?(?:the )?(?:money|cash|funds|\$)", r"\bwire\b", r"\bzelle\b", r"\bvenmo\b",
              r"\bcash ?app\b", r"\bpaypal\b", r"\btransfer\b", r"\bpay (?:me|us|the|this|a|your)\b",
-             r"\bneed (?:some )?(?:money|cash|\$)", r"\blend me\b", r"\bbail\b"]
+             r"\bneed (?:some )?(?:money|cash|\$\s?[\d,]+(?:\.\d{2})?)", r"\blend me\b", r"\bbail\b"]
 UNTRACEABLE = [r"\bgift ?cards?\b", r"\b(?:itunes|apple|google play|steam|amazon) cards?\b", r"\bbitcoin\b",
                r"\bcrypto\b", r"\busdt\b", r"\bwestern union\b", r"\bmoneygram\b", r"\bcrypto atm\b",
                r"\bcourier\b.{0,30}\bcash\b", r"\bcash\b.{0,30}\bcourier\b"]
