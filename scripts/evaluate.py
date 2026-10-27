@@ -2,6 +2,10 @@
 
     python scripts/evaluate.py                 # dev rows only (safe to look at while building)
     python scripts/evaluate.py --final         # locked test rows: run once, for the reported numbers
+    python scripts/evaluate.py --live          # include Muse Spark + second pass (needs keys in .env)
+
+For practice runs on synthetic data, set JUDGE_MODEL=muse-spark-1.3-contributor (cheaper).
+Cost is always reported at Standard prices.
 
 A row counts as flagged when Valerius would hold it (risk HIGH or above, or a
 check could not run). Catch rate = flagged positives / positives.
@@ -43,15 +47,27 @@ def to_message(row: dict) -> Message:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--final", action="store_true", help="score the locked test rows")
+    ap.add_argument("--live", action="store_true", help="call Muse Spark and the second pass")
     args = ap.parse_args()
     split = "test" if args.final else "dev"
     rows = [json.loads(x) for x in (ROOT / "data" / "benchmark.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
     rows = [r for r in rows if r["split"] == split]
 
     tp = fn = fp = tn = 0
+    cost = 0.0
+    secs: list[float] = []
+    disagreements = errors = 0
     misses, false_alarms = [], []
     for r in rows:
-        flagged = pipeline.run(to_message(r)).hold
+        res = pipeline.run(to_message(r), use_models=args.live)
+        flagged = res.hold
+        if args.live:
+            cost += res.standard_cost_usd()
+            secs += [v.seconds for v in (res.first, res.second) if v is not None and v.seconds]
+            disagreements += res.disagreement
+            errors += sum(1 for v in (res.first, res.second) if v is not None and not v.ok)
+            print(f"  {r['id']} {r['label'][:3]} -> {res.risk.name}{' HOLD' if flagged else ''}"
+                  f"{' (disagree)' if res.disagreement else ''}", flush=True)
         if r["label"] == "positive":
             tp, fn = (tp + 1, fn) if flagged else (tp, fn + 1)
             if not flagged:
@@ -63,11 +79,19 @@ def main() -> None:
 
     lo, hi = wilson(tp, tp + fn)
     flo, fhi = wilson(fp, fp + tn)
-    print(f"[{split}] stage: rules only | n={len(rows)} (synthetic, hand-labeled)")
+    stage = "rules + Muse Spark + second pass" if args.live else "rules only"
+    print(f"[{split}] stage: {stage} | n={len(rows)} (synthetic, hand-labeled)")
     print(f"  catch rate   {tp}/{tp + fn} = {tp / max(tp + fn, 1):.0%}  (95% CI {lo:.0%} to {hi:.0%})")
     print(f"  false alarms {fp}/{fp + tn} = {fp / max(fp + tn, 1):.0%}  (95% CI {flo:.0%} to {fhi:.0%})")
     print("  missed:      " + (", ".join(misses) or "none"))
     print("  false alarm: " + (", ".join(false_alarms) or "none"))
+    if args.live:
+        n = max(len(rows), 1)
+        print(f"  Muse Spark cost at Standard prices: ${cost:.4f} total, ${cost / n:.5f} per message")
+        if secs:
+            secs.sort()
+            print(f"  model call time: median {secs[len(secs) // 2]:.1f}s, slowest {secs[-1]:.1f}s")
+        print(f"  disagreements sent to a human: {disagreements} | model errors: {errors}")
 
 
 if __name__ == "__main__":
