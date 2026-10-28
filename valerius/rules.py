@@ -142,6 +142,10 @@ def _shared_rules(msg: Message) -> list[Finding]:
 
 # ---------------------------------------------------------------- business rules (Shift Lead)
 
+# The only actions the supervised agent may ask for. Anything else (an unapproved or
+# invented action) is blocked outright, never passed through.
+ALLOWED_ACTIONS = frozenset({"", "refund", "cancel", "payment_change", "account_change"})
+
 
 def _business_rules(msg: Message, policy: PolicyCard) -> tuple[list[Finding], list[str]]:
     t = msg.text
@@ -151,6 +155,10 @@ def _business_rules(msg: Message, policy: PolicyCard) -> tuple[list[Finding], li
     action = msg.requested_action
     amt = msg.amount_usd if msg.amount_usd is not None else (max(amounts(t)) if amounts(t) else None)
 
+    if action not in ALLOWED_ACTIONS:
+        out.append(Finding("unknown_action", Risk.CRITICAL,
+                           "the agent asked for an action that is not on the owner's list, so it is blocked",
+                           [_rec("requested_action", action)]))
     if action in policy.always_ask:
         out.append(Finding("owner_approval_required", Risk.HIGH,
                            f"the owner's policy says a {action.replace('_', ' ')} always needs approval",

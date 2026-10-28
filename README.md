@@ -38,6 +38,14 @@ python scripts/check_secrets.py
 
 The owner can also pause the agent: every action it asks for is then held until they resume it.
 
+## Design choices
+
+- **Verification is built in, not optional.** The rules and the hold run on every message; neither the agent nor a model can skip them.
+- **Blocking where it matters, deferred where it doesn't.** Holds are blocking: a money action waits for a person. Receipts and the learn step are recorded after.
+- **No retry loop past the gate.** Each model is asked once. If they disagree, fail, or a check can't run, the action is held; nothing loops until the models agree.
+- **Allowlisted actions.** The supervised agent can only ask for refund, cancel, payment change or account change. Any other or invented action is blocked.
+- **Ground truth is the business's own record.** Claims are checked against the order record and the message's exact words, which are cited as evidence.
+
 Copy `.env.example` to `.env` for keys. `.env` is gitignored.
 
 ## Data

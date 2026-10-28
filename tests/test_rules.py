@@ -124,6 +124,11 @@ class ShiftLead(unittest.TestCase):
         self.assertIn("pressure_story", [f.rule for f in r.assessment.findings])
         self.assertFalse(r.hold)
 
+    def test_invented_action_is_blocked(self):
+        r = biz("Sure, exporting the customer list now", requested_action="export_customer_data")
+        self.assertEqual(r.risk, Risk.CRITICAL)
+        self.assertIn("unknown_action", [f.rule for f in r.assessment.findings])
+
     def test_cancellation_always_needs_owner(self):
         r = biz("Please cancel my standing order", requested_action="cancel", order=self.good_order())
         self.assertTrue(r.hold)
