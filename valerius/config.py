@@ -56,6 +56,9 @@ class Settings:
     whatsapp_phone_number_id: str = field(default_factory=lambda: _env("WHATSAPP_PHONE_NUMBER_ID"))
     whatsapp_verify_token: str = field(default_factory=lambda: _env("WHATSAPP_VERIFY_TOKEN"))
     graph_api_version: str = field(default_factory=lambda: _env("GRAPH_API_VERSION", "v26.0"))
+    whatsapp_app_secret: str = field(default_factory=lambda: _env("WHATSAPP_APP_SECRET"))
+    trusted_contact: str = field(default_factory=lambda: _env("TRUSTED_CONTACT"))  # opted-in family number
+    server_live: bool = field(default_factory=lambda: _env("SERVER_LIVE", "1") == "1")  # call models from the server
 
     signing_secret: str = field(default_factory=lambda: _env("SIGNING_SECRET"))
     approval_base_url: str = field(default_factory=lambda: _env("APPROVAL_BASE_URL", "http://localhost:8080"))

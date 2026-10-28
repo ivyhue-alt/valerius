@@ -13,16 +13,30 @@ Built for the Meta Global AI Developer Hackathon (Indie Developer track), Oct 26
 
 Deterministic rules set a risk floor. Muse Spark and the second pass can raise risk, never lower it. If any check can't run (missing record, unreadable image, model error), Valerius says so and holds.
 
-## Run it (so far)
+## Run it
 
-Python 3.10+, no dependencies yet.
+Python 3.10+, standard library only.
 
 ```
-python -m unittest discover -s tests
+python -m unittest discover -s tests                 # all tests, no keys needed
 python -m valerius "Grandma it's me, new number. I need $900 in gift cards right now"
-python -m valerius --webhook
+python -m valerius --live "..."                      # with Muse Spark + second pass (keys in .env)
+python scripts/evaluate.py [--live]                  # benchmark, practice rows
+python scripts/demo_business.py [--live]             # Shift Lead: fake owner asks for a $1,200 refund
+python -m valerius.server                            # webhook + approval pages on :8080
+python scripts/verify_receipts.py                    # check every decision without trusting a model
 python scripts/check_secrets.py
 ```
+
+## How a held action works
+
+1. A risky request is held. The customer gets a fixed holding message; nothing is improvised.
+2. The owner gets a signed link that expires in 2 hours and works once.
+3. The approval page shows the message with the evidence highlighted, why it was held, the model reviews, and the owner's own rules.
+4. Approve or block. Every hold, decision, pause and resume writes a signed receipt chained to the one before.
+5. `verify_receipts.py` reruns the rules on every case and checks the chain. No model is needed to check a decision.
+
+The owner can also pause the agent: every action it asks for is then held until they resume it.
 
 Copy `.env.example` to `.env` for keys. `.env` is gitignored.
 

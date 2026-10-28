@@ -79,3 +79,30 @@ def fake_webhook(text: str = "", *, kind: str = "text", sender: str = "155500011
             }],
         }],
     }
+
+
+def send_text(to: str, body: str) -> dict[str, Any]:
+    """Send a free-form reply inside the 24-hour window. Without a token, writes to state/outbox.jsonl instead."""
+    import json
+    import urllib.error
+    import urllib.request
+
+    from .config import ROOT, SETTINGS
+
+    payload = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"preview_url": False, "body": body[:4000]}}
+    if not (SETTINGS.whatsapp_token and SETTINGS.whatsapp_phone_number_id):
+        out = ROOT / "state" / "outbox.jsonl"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"to": to, "body": body}) + "\n")
+        return {"dry_run": True}
+    url = f"https://graph.facebook.com/{SETTINGS.graph_api_version}/{SETTINGS.whatsapp_phone_number_id}/messages"
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST",
+                                 headers={"Authorization": f"Bearer {SETTINGS.whatsapp_token}", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        return {"error": e.code, "detail": e.read().decode("utf-8", "replace")[:300]}
+    except Exception as e:
+        return {"error": type(e).__name__}
