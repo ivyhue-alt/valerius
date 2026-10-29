@@ -22,18 +22,23 @@ def main(argv: list[str]) -> int:
         return 0
     live = "--live" in argv
     argv = [a for a in argv if a != "--live"]
-    media, kind = None, "text"
+    media, kind, audio_path = None, "text", ""
     for flag, k in (("--image", "image"), ("--voice", "audio")):
         if flag in argv:
             i = argv.index(flag)
             media, kind = Path(argv[i + 1]).read_bytes(), k
+            audio_path = argv[i + 1]
             argv = argv[:i] + argv[i + 2:]
     if argv and argv[0] == "--webhook":
         text = " ".join(argv[1:]) or "URGENT: your toll account is suspended. Pay the $4.99 fee at tolls-pay.xyz now"
         msgs = whatsapp.parse_webhook(whatsapp.fake_webhook(text))
     else:
         msgs = [Message(text=" ".join(argv), kind=kind)]
-    mime = "audio/wav" if kind == "audio" else ""
+    mime = ""
+    if kind == "audio":
+        ext = Path(audio_path).suffix.lower()
+        mime = {".wav": "audio/wav", ".ogg": "audio/ogg", ".opus": "audio/ogg", ".mp3": "audio/mpeg",
+                ".m4a": "audio/mp4", ".aac": "audio/aac", ".amr": "audio/amr"}.get(ext, "")
     for m in msgs:
         result = pipeline.run(m, use_models=live, media=media, media_mime=mime)
         print(pipeline.explain(result))

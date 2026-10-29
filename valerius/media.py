@@ -149,15 +149,122 @@ def read_image(data: bytes, post: Callable = _post_json) -> ImageReading:
     return reading
 
 
-def transcribe(data: bytes, filename: str = "voice.ogg", mime: str = "audio/ogg", timeout: float = 60) -> tuple[str, str]:
+# Muse Voice Transcribe takes only WAV: mono, 16-bit PCM, 16 or 24 kHz (dev.meta.ai/docs/speech-to-text).
+TRANSCRIBE_RATES = (16000, 24000)
+MAX_AUDIO_SECONDS = 600
+# Formats ffmpeg may open, forced by name so a crafted file can't pick another demuxer.
+FFMPEG_FORMATS = {"audio/ogg": "ogg", "audio/opus": "ogg", "audio/mpeg": "mp3", "audio/mp4": "mov",
+                  "audio/aac": "aac", "audio/amr": "amr", "audio/x-m4a": "mov"}
+
+
+def _pcm16_to_mono16k(raw: bytes, channels: int, rate: int) -> bytes:
+    """Downmix 16-bit PCM to mono and resample to 16 kHz (linear). Pure Python, no audioop."""
+    import array
+    import sys
+    samples = array.array("h")
+    samples.frombytes(raw[: len(raw) - len(raw) % (2 * channels)])
+    if sys.byteorder == "big":
+        samples.byteswap()
+    if channels > 1:
+        samples = array.array("h", (sum(samples[i:i + channels]) // channels for i in range(0, len(samples), channels)))
+    if rate not in TRANSCRIBE_RATES:
+        n_out = int(len(samples) * 16000 / rate)
+        step, last = rate / 16000, len(samples) - 1
+        out = array.array("h", bytes(2 * n_out))
+        for j in range(n_out):
+            x = j * step
+            i = int(x)
+            if i >= last:
+                out[j] = samples[last]
+            else:
+                f = x - i
+                out[j] = int(samples[i] * (1 - f) + samples[i + 1] * f)
+        samples, rate = out, 16000
+    if sys.byteorder == "big":
+        samples.byteswap()
+    return _wav_bytes(samples.tobytes(), rate)
+
+
+def _wav_bytes(pcm: bytes, rate: int) -> bytes:
+    import io
+    import wave
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(pcm)
+    return buf.getvalue()
+
+
+def prepare_audio(data: bytes, mime: str = "", run=None) -> tuple[bytes, str]:
+    """Turn a voice note into the WAV Transcribe accepts. Returns (wav, error)."""
+    import io
+    import wave
+    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+        try:
+            with wave.open(io.BytesIO(data), "rb") as w:
+                ch, width, rate, n = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
+                if not (1 <= ch <= 8 and 8000 <= rate <= 192000):
+                    return b"", "unsupported WAV layout"
+                if n / rate > MAX_AUDIO_SECONDS:
+                    return b"", "voice note longer than 10 minutes"
+                raw = w.readframes(n)
+        except (wave.Error, EOFError):
+            return b"", "unreadable WAV"
+        if width == 2:
+            if ch == 1 and rate in TRANSCRIBE_RATES:
+                return _wav_bytes(raw, rate), ""   # rewritten clean: no extra chunks or metadata
+            return _pcm16_to_mono16k(raw, ch, rate), ""
+        mime = "audio/wav"  # 8/24/32-bit WAV: let ffmpeg convert
+    fmt = "wav" if mime == "audio/wav" else FFMPEG_FORMATS.get(mime.split(";")[0].strip().lower(), "")
+    if not fmt:
+        return b"", f"voice format not supported ({mime or 'unknown'})"
+    return _ffmpeg_to_wav(data, fmt, run)
+
+
+def _ffmpeg_to_wav(data: bytes, fmt: str, run=None) -> tuple[bytes, str]:
+    import shutil
+    import subprocess
+    if run is None:
+        exe = shutil.which("ffmpeg")
+        if not exe:
+            return b"", "ffmpeg is needed to read this voice note format"
+        def run(args, inp):  # noqa: E306
+            p = subprocess.run([exe, *args], input=inp, capture_output=True, timeout=60, check=False)
+            return p.returncode, p.stdout
+    args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-protocol_whitelist", "pipe",
+            "-f", fmt, "-i", "pipe:0", "-t", str(MAX_AUDIO_SECONDS),
+            "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", "-map_metadata", "-1", "-f", "wav", "pipe:1"]
+    try:
+        code, out = run(args, data)
+    except Exception as e:
+        return b"", f"audio conversion failed ({type(e).__name__})"
+    if code != 0 or out[:4] != b"RIFF":
+        return b"", "audio conversion failed"
+    if out[4:8] == b"\xff\xff\xff\xff":  # ffmpeg writing to a pipe can't seek back to fill in the sizes
+        out = out[:4] + (len(out) - 8).to_bytes(4, "little") + out[8:]
+        idx = out.find(b"data", 12)
+        if idx != -1:
+            out = out[:idx + 4] + (len(out) - idx - 8).to_bytes(4, "little") + out[idx + 8:]
+    return out, ""
+
+
+def transcribe(data: bytes, filename: str = "voice.wav", mime: str = "audio/ogg", timeout: float = 60,
+               post=None) -> tuple[str, str]:
     """Muse Voice Transcribe, file endpoint. Returns (text, error)."""
+    wav, err = prepare_audio(data, mime)
+    if err:
+        return "", err
     boundary = uuid.uuid4().hex
-    request = json.dumps({"model": "muse-voice-transcribe-1.0"})
+    request = json.dumps({"model": "muse-voice-transcribe-1.0", "audioEncoding": "WAV"})
     body = b"".join([
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"request\"\r\nContent-Type: application/json\r\n\r\n{request}\r\n".encode(),
-        f"--{boundary}\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"{filename}\"\r\nContent-Type: {mime}\r\n\r\n".encode(),
-        data, b"\r\n", f"--{boundary}--\r\n".encode(),
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"{filename}\"\r\nContent-Type: audio/wav\r\n\r\n".encode(),
+        wav, b"\r\n", f"--{boundary}--\r\n".encode(),
     ])
+    if post is not None:
+        return post(body, boundary)
     req = urllib.request.Request(SETTINGS.model_base_url.rstrip("/") + "/asr/transcribe", data=body, method="POST",
                                  headers={"Authorization": f"Bearer {SETTINGS.model_api_key}",
                                           "Content-Type": f"multipart/form-data; boundary={boundary}"})
@@ -177,7 +284,7 @@ def extract_transcript(res) -> str:
         return res
     if not isinstance(res, dict):
         return ""
-    for key in ("text", "transcript"):
+    for key in ("transcript", "text"):
         if isinstance(res.get(key), str):
             return res[key]
     for key in ("turns", "segments", "results", "utterances"):

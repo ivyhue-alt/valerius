@@ -121,12 +121,17 @@ def voice() -> None:
     if not p.is_file():
         print("No state/probe/voice.wav. Make one with the PowerShell text-to-speech command Claude gave you.")
         return
+    from valerius.media import prepare_audio
+    wav, err = prepare_audio(p.read_bytes(), "audio/wav")
+    if err:
+        print(f"Could not prepare the audio: {err}")
+        return
     boundary = uuid.uuid4().hex
-    request = json.dumps({"model": "muse-voice-transcribe-1.0"})
+    request = json.dumps({"model": "muse-voice-transcribe-1.0", "audioEncoding": "WAV"})
     parts = [
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"request\"\r\nContent-Type: application/json\r\n\r\n{request}\r\n".encode(),
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"voice.wav\"\r\nContent-Type: audio/wav\r\n\r\n".encode()
-        + p.read_bytes() + b"\r\n",
+        + wav + b"\r\n",
         f"--{boundary}--\r\n".encode(),
     ]
     _post("voice_transcribe", "/asr/transcribe", data=b"".join(parts), ctype=f"multipart/form-data; boundary={boundary}")
