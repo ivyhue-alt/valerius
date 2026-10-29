@@ -23,6 +23,8 @@ python -m valerius "Grandma it's me, new number. I need $900 in gift cards right
 python -m valerius --live "..."                      # with Muse Spark + second pass (keys in .env)
 python scripts/evaluate.py [--live]                  # benchmark, practice rows
 python scripts/demo_business.py [--live]             # Shift Lead: fake owner asks for a $1,200 refund
+python scripts/demo_business.py --serial             # Shift Lead: same customer's third damage claim in 40 days
+python scripts/run_scenarios.py                      # repeat-claims scenarios (reported separately)
 python -m valerius.server                            # webhook + approval pages on :8080
 python scripts/verify_receipts.py                    # check every decision without trusting a model
 python scripts/check_secrets.py
@@ -44,6 +46,7 @@ The owner can also pause the agent: every action it asks for is then held until 
 - **Blocking where it matters, deferred where it doesn't.** Holds are blocking: a money action waits for a person. Receipts and the learn step are recorded after.
 - **No retry loop past the gate.** Each model is asked once. If they disagree, fail, or a check can't run, the action is held; nothing loops until the models agree.
 - **Allowlisted actions.** The supervised agent can only ask for refund, cancel, payment change or account change. Any other or invented action is blocked.
+- **Valerius keeps the claim history the business doesn't.** Each customer's refund and reship claims are counted; past the owner's limit, the owner decides. Limits are per item and per request, so a business with larger orders isn't held on every claim.
 - **Ground truth is the business's own record.** Claims are checked against the order record and the message's exact words, which are cited as evidence.
 
 Copy `.env.example` to `.env` for keys. `.env` is gitignored.

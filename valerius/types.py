@@ -49,6 +49,9 @@ class Message:
     requested_action: str = ""         # business side: refund | cancel | payment_change | account_change | ""
     amount_usd: float | None = None    # business side: amount of the requested action
     order: OrderRecord | None = None
+    customer_id: str = ""              # business side: who is asking (a phone number or account id)
+    items: list[dict] | None = None    # business side: [{"name", "price_usd", "qty"}] the request covers
+    prior_claims: int | None = None    # business side: this customer's refund/reship claims in the window
 
 
 @dataclass

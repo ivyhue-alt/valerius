@@ -88,7 +88,8 @@ INJECTION = [r"\bignore (?:all |your |the |any )?(?:previous |prior |above )?(?:
 LINK = re.compile(r"\bhttps?://[^\s]+|\b(?:[a-z0-9-]+\.)+(?:xyz|top|click|info|ru|zip|link|live|icu|shop|cc|vip|buzz)\b(?:/\S*)?|\b(?:bit\.ly|tinyurl\.com|t\.co|rb\.gy|cutt\.ly)/\S+", re.I)
 OWNER_CLAIM = [r"\b(?:i'?m|i am|this is) the (?:owner|manager|boss|ceo)\b", r"\bon behalf of the owner\b"]
 DEFECT_CLAIM = [r"\b(?:defect(?:ive)?|damaged|broken|ripped|torn|stained|faulty|doesn'?t work|stopped working)\b"]
-NOT_ARRIVED = [r"\bnever (?:arrived|came|got (?:it|my order|the package))\b", r"\b(?:didn'?t|did not) (?:arrive|receive|get)\b",
+NOT_ARRIVED = [r"\b(?:package|order|parcel|box|delivery|it) (?:was |got |has been )?(?:lost|stolen|missing)\b",
+               r"\bstolen from (?:the|my) (?:porch|door|doorstep|mailbox)\b", r"\bnever (?:arrived|came|got (?:it|my order|the package))\b", r"\b(?:didn'?t|did not) (?:arrive|receive|get)\b",
                r"\bnot (?:delivered|received)\b"]
 GIFT_CARD_DISPUTE = [r"\b(?:gift ?card|gc)\b.{0,60}\b(?:no|zero|empty|missing|never (?:loaded|added)|wasn'?t loaded|not loaded|\$0)\b",
                      r"\b(?:balance|funds)\b.{0,40}\b(?:never|not|wasn'?t)\b.{0,20}\b(?:loaded|added|there)\b"]
@@ -145,12 +146,15 @@ def _shared_rules(msg: Message) -> list[Finding]:
 
 # The only actions the supervised agent may ask for. Anything else (an unapproved or
 # invented action) is blocked outright, never passed through.
-ALLOWED_ACTIONS = frozenset({"", "refund", "cancel", "payment_change", "account_change"})
+ALLOWED_ACTIONS = frozenset({"", "refund", "reship", "cancel", "payment_change", "account_change"})
+CLAIM_ACTIONS = ("refund", "reship")
 
 # The same actions as they appear in a customer's words. The agent's action field can be
 # blank or wrong, so the text is checked too and the stricter reading wins.
 ACTION_WORDS = {
     "refund": [r"\brefund", r"\bmoney back\b", r"\breimburse", r"\bchargeback\b", r"\breturn\b"],
+    "reship": [r"\breship", r"\bresend\b", r"\bsend (?:it |me |us )?(?:another|again|a new one|a replacement)\b",
+               r"\breplacement\b", r"\bship (?:it |another )?again\b"],
     "cancel": [r"\bcancel", r"\bstop (?:my|the) (?:order|subscription|plan)\b", r"\bunsubscribe\b"],
     "payment_change": [r"\b(?:change|update|switch|replace) (?:the |my )?(?:card|payment|billing|bank|payout)",
                        r"\bnew card\b", r"\bcard on file\b", r"\bpayout (?:account|details)\b"],
@@ -194,16 +198,37 @@ def _business_rules(msg: Message, policy: PolicyCard) -> tuple[list[Finding], li
             ev = [_rec("requested_action", action)] if action == act else [implied[act]]
             out.append(Finding("owner_approval_required", Risk.HIGH,
                                f"the owner's policy says a {act.replace('_', ' ')} always needs approval", ev))
-    if action == "refund" or "refund" in implied:
-        if amt is None:
-            if action == "refund":
-                incomplete.append("refund amount unknown")
+    is_claim = action in CLAIM_ACTIONS or any(a in implied for a in CLAIM_ACTIONS)
+    if is_claim:
+        kind = action if action in CLAIM_ACTIONS else next(a for a in CLAIM_ACTIONS if a in implied)
+        items = [i for i in (msg.items or []) if isinstance(i, dict)]
+        if items:
+            prices = [float(i.get("price_usd", 0) or 0) for i in items]
+            total = sum(float(i.get("price_usd", 0) or 0) * int(i.get("qty", 1) or 1) for i in items)
+            amt = max(total, amt or 0)
+            top = max(prices) if prices else 0
+            if top > policy.refund_limit_usd:
+                out.append(Finding("item_over_limit", Risk.HIGH,
+                                   f"an item at ${top:,.2f} is over the ${policy.refund_limit_usd:,.0f} per-item limit",
+                                   [_rec("highest_item_usd", f"{top:,.2f}"), _rec("policy.per_item_limit_usd", f"{policy.refund_limit_usd:,.2f}")]))
+            if total > policy.order_limit_usd:
+                out.append(Finding("order_over_limit", Risk.HIGH,
+                                   f"the {kind} totals ${total:,.2f}, over the ${policy.order_limit_usd:,.0f} per-request limit",
+                                   [_rec("total_usd", f"{total:,.2f}"), _rec("policy.per_request_limit_usd", f"{policy.order_limit_usd:,.2f}")]))
+        elif amt is None:
+            if action in CLAIM_ACTIONS:
+                incomplete.append(f"{kind} amount unknown")
         elif amt > policy.refund_limit_usd:
             out.append(Finding("refund_over_limit", Risk.HIGH,
-                               f"refund of ${amt:,.0f} is over the ${policy.refund_limit_usd:,.0f} the agent may approve alone",
+                               f"{kind} of ${amt:,.0f} is over the ${policy.refund_limit_usd:,.0f} the agent may approve alone",
                                [_rec("amount_usd", f"{amt:,.2f}"), _rec("policy.refund_limit_usd", f"{policy.refund_limit_usd:,.2f}")]))
-        if action == "refund" and o is None:
-            incomplete.append("no order record to check the refund against")
+        if action in CLAIM_ACTIONS and o is None:
+            incomplete.append(f"no order record to check the {kind} against")
+        if msg.prior_claims is not None and msg.prior_claims >= policy.max_claims:
+            out.append(Finding("repeat_claims", Risk.HIGH,
+                               f"this would be the customer's claim number {msg.prior_claims + 1} in {policy.claim_window_days} days "
+                               f"(the owner's limit is {policy.max_claims})",
+                               [_rec("prior_claims", msg.prior_claims), _rec("policy.max_claims", policy.max_claims)]))
 
     if (e := _search(OWNER_CLAIM, t)):
         out.append(Finding("owner_impersonation", Risk.HIGH, "a customer claims to be the owner or a manager", [e]))

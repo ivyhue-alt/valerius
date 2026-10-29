@@ -37,13 +37,17 @@ def _env(name: str, default: str = "") -> str:
 class PolicyCard:
     """What the business owner lets the agent do alone. Shown on every approval page."""
     business_name: str = "Rosewood Bakery"   # fictional demo business
-    refund_limit_usd: float = 50.0
+    refund_limit_usd: float = 50.0           # per item, for refunds and reships
+    order_limit_usd: float = 150.0           # total per request
+    max_claims: int = 2                      # refund/reship claims per customer before the owner decides
+    claim_window_days: int = 90
     always_ask: tuple[str, ...] = ("cancel", "payment_change", "account_change")
 
     def lines(self) -> list[str]:
         return [
-            f"Refunds up to ${self.refund_limit_usd:,.0f}: agent may approve alone.",
-            "Anything over that, cancellations, payment changes and account changes: owner approves.",
+            f"Refunds and reships up to ${self.refund_limit_usd:,.0f} per item and ${self.order_limit_usd:,.0f} per request: agent may approve alone.",
+            f"A customer's claim number {self.max_claims + 1} or more within {self.claim_window_days} days: owner decides.",
+            "Damage claims without a photo, cancellations, payment changes and account changes: owner approves.",
         ]
 
 

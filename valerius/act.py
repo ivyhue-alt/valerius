@@ -153,7 +153,33 @@ def _model_record(result: Result) -> dict:
     return out
 
 
-def open_case(result: Result, store: Store) -> dict:
+def count_claims(store: Store, customer_id: str, window_days: int, now: int | None = None) -> int:
+    """How many refund/reship claims this customer made in the window. Valerius keeps this count
+    for the business, since most small businesses don't track it."""
+    if not customer_id:
+        return 0
+    now = now if now is not None else int(time.time())
+    since = now - window_days * 86400
+    n = 0
+    for p in (store.root / "cases").glob("*.json"):
+        try:
+            c = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if c.get("customer_id") == customer_id and c.get("is_claim") and since <= int(c.get("created_at", 0)) <= now:
+            n += 1
+    return n
+
+
+def with_history(msg, store: Store, now: int | None = None):
+    """Attach the customer's recent claim count before the rules run (business side only)."""
+    from dataclasses import replace as _replace
+    if msg.channel != "business" or not msg.customer_id:
+        return msg
+    return _replace(msg, prior_claims=count_claims(store, msg.customer_id, SETTINGS.policy.claim_window_days, now))
+
+
+def open_case(result: Result, store: Store, now: int | None = None) -> dict:
     """Record what Valerius saw and decided. Held cases get a signed decision link."""
     msg = result.message
     agent = store.agent()
@@ -163,7 +189,12 @@ def open_case(result: Result, store: Store) -> dict:
     hold = result.hold or (paused and asks_for_action)
     case = {
         "id": uuid.uuid4().hex[:12],
-        "created_at": int(time.time()),
+        "created_at": now if now is not None else int(time.time()),
+        "customer_id": msg.customer_id,
+        "items": msg.items,
+        "prior_claims": msg.prior_claims,
+        "is_claim": msg.channel == "business" and (msg.requested_action in ("refund", "reship")
+                                                     or any(a in implied_actions(msg.text) for a in ("refund", "reship"))),
         "channel": msg.channel,
         "kind": msg.kind,
         "text": msg.text,  # redacted

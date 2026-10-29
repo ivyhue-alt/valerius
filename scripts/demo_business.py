@@ -4,6 +4,7 @@
     python scripts/demo_business.py --live     # with Muse Spark and the second pass
     python scripts/demo_business.py --pause    # pause the agent first (every requested action is held)
     python scripts/demo_business.py --resume
+    python scripts/demo_business.py --serial   # same customer, third damage claim in a month
 
 Prints what the agent tells the customer and the owner's approval link.
 Run the server (python -m valerius.server) to open the link.
@@ -12,6 +13,7 @@ Run the server (python -m valerius.server) to open the link.
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,8 +33,34 @@ SCENARIO = Message(
 )
 
 
+SERIAL = [
+    (40, "The bread arrived squished, photo attached. Can I get my $18 back?", 18.0),
+    (18, "Cookies were broken, here's a photo. $14 refund please.", 14.0),
+    (0, "The cake was damaged again, photo attached. Refund $22.", 22.0),
+]
+
+
+def serial(store: act.Store, live: bool) -> int:
+    now = int(time.time())
+    for days_ago, text, amount in SERIAL:
+        t = now - days_ago * 86400
+        msg = Message(text=text, channel=Channel.BUSINESS, customer_id="15550002222", requested_action="refund",
+                      amount_usd=amount, order=OrderRecord(order_id=f"ORD-{days_ago}", delivered=True,
+                                                           receipt_on_file=True, photo_provided=True))
+        msg = act.with_history(msg, store, now=t)
+        result = pipeline.run(msg, use_models=live and days_ago == 0)
+        case = act.open_case(result, store, now=t)
+        print(f"{days_ago:>2} days ago: ${amount:.2f} refund -> {case['status'].upper()}")
+        if case["status"] == "held":
+            print(pipeline.explain(result))
+            print("Owner gets: " + act.owner_alert(case))
+    return 0
+
+
 def main(argv: list[str]) -> int:
     store = act.Store()
+    if "--serial" in argv:
+        return serial(store, "--live" in argv)
     if "--pause" in argv:
         act.set_paused(True, store)
         print("Agent paused.")

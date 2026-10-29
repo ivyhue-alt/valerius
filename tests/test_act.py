@@ -139,7 +139,7 @@ class Page(Base):
         case = act.open_case(pipeline.run(REFUND), self.store)
         html = page.approval_page(case, act.sign(case["id"], "decide"), act.track_record(self.store), act.agent_token())
         self.assertIn("<mark>", html)
-        self.assertIn("Refunds up to $50", html)
+        self.assertIn("Refunds and reships up to $50", html)
         self.assertIn("Pause agent", html)
 
 
