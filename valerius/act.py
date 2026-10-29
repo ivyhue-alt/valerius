@@ -193,6 +193,9 @@ def open_case(result: Result, store: Store, now: int | None = None) -> dict:
         "customer_id": msg.customer_id,
         "items": msg.items,
         "prior_claims": msg.prior_claims,
+        "media_read": msg.media_read,
+        "image_fields": msg.image_fields,
+        "media": result.media,
         "is_claim": msg.channel == "business" and (msg.requested_action in ("refund", "reship")
                                                      or any(a in implied_actions(msg.text) for a in ("refund", "reship"))),
         "channel": msg.channel,

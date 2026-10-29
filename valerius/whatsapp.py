@@ -87,6 +87,36 @@ def fake_webhook(text: str = "", *, kind: str = "text", sender: str = "155500011
     }
 
 
+def download_media(media_id: str, max_bytes: int = 16_000_000) -> tuple[bytes, str, str]:
+    """Fetch a WhatsApp image or voice note by its media id. Returns (data, mime, error)."""
+    import json
+    import re
+    import urllib.error
+    import urllib.request
+
+    from .config import SETTINGS
+
+    if not (SETTINGS.whatsapp_token and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", media_id or "")):
+        return b"", "", "no token or bad media id"
+    auth = {"Authorization": f"Bearer {SETTINGS.whatsapp_token}"}
+    try:
+        meta_req = urllib.request.Request(f"https://graph.facebook.com/{SETTINGS.graph_api_version}/{media_id}", headers=auth)
+        with urllib.request.urlopen(meta_req, timeout=20) as r:
+            meta = json.loads(r.read().decode())
+        url = meta.get("url", "")
+        if not url.startswith("https://"):
+            return b"", "", "media url missing"
+        with urllib.request.urlopen(urllib.request.Request(url, headers=auth), timeout=30) as r:
+            data = r.read(max_bytes + 1)
+        if len(data) > max_bytes:
+            return b"", "", "media too large"
+        return data, str(meta.get("mime_type", "")), ""
+    except urllib.error.HTTPError as e:
+        return b"", "", f"HTTP {e.code}"
+    except Exception as e:
+        return b"", "", type(e).__name__
+
+
 def send_text(to: str, body: str) -> dict[str, Any]:
     """Send a free-form reply inside the 24-hour window. Without a token, writes to state/outbox.jsonl instead."""
     import json

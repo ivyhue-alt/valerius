@@ -54,7 +54,8 @@ def verify(store: act.Store, check_sig: bool = True) -> list[str]:
             order = OrderRecord(**case["order"]) if case.get("order") else None
             msg = Message(text=case["text"], channel=case["channel"], kind=case.get("kind", "text"),
                           requested_action=case.get("requested_action", ""), amount_usd=case.get("amount_usd"), order=order,
-                          customer_id=case.get("customer_id", ""), items=case.get("items"), prior_claims=case.get("prior_claims"))
+                          customer_id=case.get("customer_id", ""), items=case.get("items"), prior_claims=case.get("prior_claims"),
+                          media_read=bool(case.get("media_read")), image_fields=case.get("image_fields"))
             a = rules.check(msg)
             fired = sorted(f"{f.rule}:{f.risk.name}" for f in a.findings)
             stored_incomplete = [x for x in r["rules"].get("incomplete", []) if not x.startswith("message longer than")]

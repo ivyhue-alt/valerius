@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from . import judge as judge_mod
+from . import media as media_mod
 from . import redact, rules, textnorm
 from .types import Assessment, Message, Risk
 
@@ -24,6 +25,7 @@ class Result:
     first: judge_mod.Verdict | None = None
     second: judge_mod.Verdict | None = None
     disagreement: bool = False
+    media: dict = field(default_factory=dict)
 
     @property
     def risk(self) -> Risk:
@@ -56,12 +58,36 @@ class Result:
         return (self.first.prompt_tokens * PRICE_IN + self.first.completion_tokens * PRICE_OUT) / 1e6
 
 
+def read_media(msg: Message, data: bytes, mime: str = "", image_reader=None, transcriber=None) -> tuple[Message, dict]:
+    """Read an image or voice note. Returns the message updated with what was read, plus details for the case."""
+    details: dict = {}
+    if msg.kind == "image":
+        reading = (image_reader or media_mod.read_image)(data)
+        details = {"image_error": reading.error, "regions": reading.regions, "image_seconds": round(reading.seconds, 1)}
+        if not reading.error:
+            msg = replace(msg, image_fields=reading.fields, media_read=True)
+    elif msg.kind == "audio":
+        if transcriber:
+            text, err = transcriber(data)
+        else:
+            text, err = media_mod.transcribe(data, mime=mime or "audio/ogg")
+        details = {"voice_error": err}
+        if not err and text.strip():
+            joined = (msg.text + "\n" if msg.text else "") + "[voice note] " + text
+            msg = replace(msg, text=joined, media_read=True)
+    return msg, details
+
+
 def run(msg: Message, *, use_models: bool = False,
-        judge_chat: judge_mod.ChatFn | None = None, second_chat: judge_mod.ChatFn | None = None) -> Result:
+        judge_chat: judge_mod.ChatFn | None = None, second_chat: judge_mod.ChatFn | None = None,
+        media: bytes | None = None, media_mime: str = "", image_reader=None, transcriber=None) -> Result:
+    media_details: dict = {}
+    if media is not None and (use_models or image_reader or transcriber):
+        msg, media_details = read_media(msg, media, media_mime, image_reader, transcriber)
     normal, truncated = textnorm.normalize(msg.text)
     clean_text, counts = redact.redact(normal)
     clean = replace(msg, text=clean_text)
-    result = Result(message=clean, assessment=rules.check(clean), redactions=counts)
+    result = Result(message=clean, assessment=rules.check(clean), redactions=counts, media=media_details)
     if truncated:
         result.assessment.incomplete.append(f"message longer than {textnorm.MAX_CHARS} characters, only the start was checked")
     if use_models:

@@ -122,9 +122,10 @@ def voice() -> None:
         print("No state/probe/voice.wav. Make one with the PowerShell text-to-speech command Claude gave you.")
         return
     boundary = uuid.uuid4().hex
+    request = json.dumps({"model": "muse-voice-transcribe-1.0"})
     parts = [
-        f"--{boundary}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\nmuse-voice-transcribe-1.0\r\n".encode(),
-        f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voice.wav\"\r\nContent-Type: audio/wav\r\n\r\n".encode()
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"request\"\r\nContent-Type: application/json\r\n\r\n{request}\r\n".encode(),
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"voice.wav\"\r\nContent-Type: audio/wav\r\n\r\n".encode()
         + p.read_bytes() + b"\r\n",
         f"--{boundary}--\r\n".encode(),
     ]

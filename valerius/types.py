@@ -52,6 +52,8 @@ class Message:
     customer_id: str = ""              # business side: who is asking (a phone number or account id)
     items: list[dict] | None = None    # business side: [{"name", "price_usd", "qty"}] the request covers
     prior_claims: int | None = None    # business side: this customer's refund/reship claims in the window
+    media_read: bool = False           # the image or voice note was actually read
+    image_fields: dict | None = None   # what Muse Spark read off an image (fixed fields, untrusted)
 
 
 @dataclass

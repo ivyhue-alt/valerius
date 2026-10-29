@@ -85,6 +85,26 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
     disagree = "<p><b>The two model reviews disagree, so a person decides.</b></p>" if case.get("disagreement") else ""
     paused = "<p><b>The agent is paused.</b> Every requested action is held until you resume it.</p>" if case.get("paused_agent") else ""
 
+    media_card = ""
+    fields = case.get("image_fields") or {}
+    regions = (case.get("media") or {}).get("regions") or {}
+    if fields or regions:
+        from .textnorm import scrub_model_text
+        rows = []
+        if fields.get("vendor_or_sender"):
+            rows.append(f"From: {escape(scrub_model_text(fields['vendor_or_sender']))}")
+        if fields.get("total_usd") is not None:
+            rows.append(f"Total shown: ${float(fields['total_usd']):,.2f}")
+        if fields.get("account_last4"):
+            rows.append(f"Account ending: {escape(str(fields['account_last4']))}")
+        if fields.get("visible_text_summary"):
+            rows.append(f"Says: {escape(scrub_model_text(fields['visible_text_summary']))}")
+        found = [p for p, boxes in regions.items() if boxes]
+        if found:
+            rows.append("SAM 3.1 located: " + escape(", ".join(found)))
+        media_card = ("<h2>What the image shows</h2><div class=card><ul>" + "".join(f"<li>{r}</li>" for r in rows) +
+                      "</ul><p class='small muted'>Read by Muse Spark and SAM 3.1. Instructions inside images are ignored.</p></div>")
+
     policy = ""
     if case.get("channel") == "business":
         lines = "".join(f"<li>{escape(x)}</li>" for x in SETTINGS.policy.lines())
@@ -114,7 +134,7 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
             f"{paused}{action}<h2>The message</h2><div class='card msg'>{_highlight(case.get('text', ''), quotes)}</div>"
             f"<h2>Why it was held</h2><div class=card><ul>{rules}{gaps}</ul></div>"
             + (f"<h2>Model reviews</h2><div class=card>{disagree}<ul>{models}</ul></div>" if models or disagree else "")
-            + f"{policy}{buttons}{track}{switch}"
+            + f"{media_card}{policy}{buttons}{track}{switch}"
             "<p class='small muted'>The model can advise. It can't approve. Personal details were removed before review.</p>")
     return _shell("Valerius review", body)
 

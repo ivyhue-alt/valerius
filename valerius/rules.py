@@ -290,6 +290,40 @@ def _business_rules(msg: Message, policy: PolicyCard) -> tuple[list[Finding], li
     return out, incomplete
 
 
+# ---------------------------------------------------------------- image rules
+
+
+def _image_rules(msg: Message) -> list[Finding]:
+    """Rules on the fixed fields read from an image. The image is untrusted; only these fields are used."""
+    f = msg.image_fields or {}
+    out: list[Finding] = []
+    if f.get("says_bank_details_changed"):
+        out.append(Finding("image_payment_redirect", Risk.CRITICAL, "the image says the bank or payment details changed",
+                           [_rec("image.says_bank_details_changed", True)] +
+                           ([_rec("image.account_last4", f["account_last4"])] if f.get("account_last4") else [])))
+    if f.get("asks_for_gift_cards_or_crypto"):
+        out.append(Finding("image_untraceable_payment", Risk.HIGH, "the image asks for gift cards or crypto",
+                           [_rec("image.asks_for_gift_cards_or_crypto", True)]))
+    if f.get("asks_for_payment") and f.get("urgent_or_threatening"):
+        out.append(Finding("image_urgent_payment", Risk.HIGH, "the image pressures you to pay fast",
+                           [_rec("image.asks_for_payment", True), _rec("image.urgent_or_threatening", True)]))
+    for link in f.get("links_or_domains") or []:
+        if LINK.search(str(link)):
+            out.append(Finding("image_suspicious_link", Risk.HIGH if f.get("asks_for_payment") else Risk.MEDIUM,
+                               "the image contains a link you should not open", [_rec("image.link", link)]))
+            break
+    if f.get("has_qr_code") and f.get("asks_for_payment"):
+        out.append(Finding("image_qr_payment", Risk.HIGH, "the image asks you to pay through a QR code",
+                           [_rec("image.has_qr_code", True)]))
+    total = f.get("total_usd")
+    said = amounts(msg.text)
+    if isinstance(total, (int, float)) and said and abs(max(said) - total) > 0.5:
+        out.append(Finding("image_amount_mismatch", Risk.HIGH,
+                           f"the image shows ${total:,.2f} but the message says ${max(said):,.2f}",
+                           [_rec("image.total_usd", f"{total:,.2f}"), _rec("amount_in_message", f"{max(said):,.2f}")]))
+    return out
+
+
 # ---------------------------------------------------------------- entry point
 
 
@@ -301,7 +335,9 @@ def check(msg: Message, policy: PolicyCard | None = None) -> Assessment:
     if msg.channel == Channel.BUSINESS:
         biz, incomplete = _business_rules(msg, policy)
         findings += biz
-    if msg.kind in ("image", "audio", "document", "video", "other"):
+    if msg.image_fields:
+        findings += _image_rules(msg)
+    if msg.kind in ("image", "audio", "document", "video", "other") and not msg.media_read:
         # A caption is not the content. Until SAM or transcription has read the media, it is unverified.
         incomplete.append(f"{msg.kind} not yet read")
     floor = max((f.risk for f in findings), default=Risk.LOW)

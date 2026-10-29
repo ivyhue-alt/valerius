@@ -78,7 +78,11 @@ def _handle_one(msg, store: act.Store, live: bool) -> dict:
         return {"skipped": "sender is not a valid phone number"}
     if not _allowed(msg.sender):
         return {"skipped": "rate limited"}
-    result = pipeline.run(msg, use_models=live)
+    data, mime = None, ""
+    if live and msg.kind in ("image", "audio") and msg.media_id:
+        data, mime, err = whatsapp.download_media(msg.media_id)
+        data = data or None  # failed download: the media stays unread, which holds
+    result = pipeline.run(msg, use_models=live, media=data, media_mime=mime)
     case = act.open_case(result, store)
     reply = act.family_reply(result)
     sent = [whatsapp.send_text(msg.sender, reply)]
