@@ -123,11 +123,11 @@ def send_text(to: str, body: str) -> dict[str, Any]:
     import urllib.error
     import urllib.request
 
-    from .config import ROOT, SETTINGS
+    from .config import SETTINGS, state_dir
 
     payload = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"preview_url": False, "body": body[:4000]}}
     if not (SETTINGS.whatsapp_token and SETTINGS.whatsapp_phone_number_id):
-        out = ROOT / "state" / "outbox.jsonl"
+        out = state_dir() / "outbox.jsonl"
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps({"to": to, "body": body}) + "\n")

@@ -60,11 +60,28 @@ def _flat(qs: dict[str, list[str]]) -> dict[str, str]:
     return {k: v[0] for k, v in qs.items() if v}
 
 
+_SEEN: deque = deque(maxlen=2000)   # message ids already handled (Meta re-sends if it doesn't hear back)
+_SEEN_LOCK = threading.Lock()
+
+
+def _first_time(message_id: str) -> bool:
+    if not message_id:
+        return True
+    with _SEEN_LOCK:
+        if message_id in _SEEN:
+            return False
+        _SEEN.append(message_id)
+        return True
+
+
 def handle_incoming(payload: dict, store: act.Store = STORE, use_models: bool | None = None) -> list[dict]:
     """Run each incoming message through the loop. Returns what was done, for logs and tests."""
     live = SETTINGS.server_live if use_models is None else use_models
     done = []
     for msg in whatsapp.parse_webhook(payload):
+        if not _first_time(msg.conversation_id):
+            done.append({"skipped": "already handled"})
+            continue
         try:
             done.append(_handle_one(msg, store, live))
         except Exception as e:  # one bad message must not break the rest or make Meta retry
@@ -91,6 +108,12 @@ def _handle_one(msg, store: act.Store, live: bool) -> dict:
         alert = ("Valerius: a message sent to your family member looks like a scam "
                  f"({result.risk.name}). Details: {case.get('link', '')}")
         sent.append(whatsapp.send_text(contact, alert))
+    failed = [x for x in sent if isinstance(x, dict) and x.get("error")]
+    # Logs only (private to the operator). Never the message text or the sender's number.
+    sys.stderr.write(f"case {case['id']}: {case['risk']} {case['status']} kind={msg.kind} "
+                     f"reply={'FAILED ' + str(failed[0].get('error')) if failed else 'sent'}\n")
+    if failed and case.get("link"):
+        sys.stderr.write(f"  case page (reply could not be sent): {case['link']}\n")
     return {"case": case["id"], "status": case["status"], "risk": case["risk"], "sent": sent}
 
 
@@ -174,7 +197,8 @@ class Handler(BaseHTTPRequestHandler):
             except (UnicodeDecodeError, json.JSONDecodeError):
                 return self._send(400, "bad json", "text/plain")
             if isinstance(payload, dict):
-                handle_incoming(payload)
+                # Answer Meta right away; reading images and asking the models can take 15s+.
+                threading.Thread(target=handle_incoming, args=(payload,), daemon=True).start()
             return self._send(200, "ok", "text/plain")  # always 200 so Meta does not retry storms
         form = _flat(parse_qs(raw.decode("utf-8", "replace")))
         m = re.fullmatch(r"/case/([a-f0-9]{12})/decide", u.path)

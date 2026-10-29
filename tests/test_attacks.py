@@ -258,6 +258,13 @@ class Server(Store):
         out = server.handle_incoming(payload, self.store, use_models=False)
         self.assertEqual(len(out), 2)
 
+    def test_meta_resend_is_handled_once(self):
+        payload = whatsapp.fake_webhook("hello again", sender="15550002222")
+        first = server.handle_incoming(payload, self.store, use_models=False)[0]
+        again = server.handle_incoming(payload, self.store, use_models=False)[0]
+        self.assertIn("case", first)
+        self.assertEqual(again.get("skipped"), "already handled")
+
     def test_non_json_webhook_is_rejected_cleanly(self):
         self.assertEqual(self.post("/webhook", b"not json"), 400)
 

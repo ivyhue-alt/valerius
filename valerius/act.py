@@ -25,13 +25,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
-from .config import ROOT, SETTINGS
+from .config import SETTINGS, state_dir
 from .pipeline import Result
 from .rules import implied_actions
 from .textnorm import scrub_model_text
 from .types import Risk
 
-STATE = ROOT / "state"           # gitignored runtime state
+STATE = state_dir()              # gitignored runtime state
 _LOCK = threading.Lock()
 _EPHEMERAL_SECRET = secrets.token_hex(32)
 

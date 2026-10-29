@@ -51,6 +51,11 @@ class PolicyCard:
         ]
 
 
+def state_dir() -> Path:
+    """Where cases and receipts live. VALERIUS_STATE moves it (Modal mounts a volume there)."""
+    return Path(os.environ.get("VALERIUS_STATE") or ROOT / "state")
+
+
 @dataclass(frozen=True)
 class Settings:
     model_api_key: str = field(default_factory=lambda: _env("MODEL_API_KEY"))

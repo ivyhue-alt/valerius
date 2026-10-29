@@ -42,8 +42,9 @@ def main(argv: list[str]) -> int:
     for m in msgs:
         result = pipeline.run(m, use_models=live, media=media, media_mime=mime)
         print(pipeline.explain(result))
-        if result.media:
-            print("  media: " + ", ".join(f"{k}={v}" for k, v in result.media.items() if v))
+        shown = {k: v for k, v in result.media.items() if v}
+        if shown:
+            print("  media: " + ", ".join(f"{k}={v}" for k, v in shown.items()))
     return 0
 
 
