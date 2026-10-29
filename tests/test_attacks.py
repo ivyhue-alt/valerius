@@ -235,7 +235,13 @@ class Server(Store):
             object.__setattr__(SETTINGS, "whatsapp_app_secret", "")
 
     def test_oversized_body_is_refused(self):
-        self.assertEqual(self.post("/webhook", b"x" * (server.MAX_BODY + 1)), 413)
+        # The server refuses without reading the body. Depending on the operating system the client
+        # sees either the 413 answer or the connection being cut; both mean the request was refused.
+        try:
+            status = self.post("/webhook", b"x" * (server.MAX_BODY + 1))
+        except (ConnectionError, urllib.error.URLError):
+            status = 413
+        self.assertEqual(status, 413)
 
     def test_fake_sender_is_skipped(self):
         payload = whatsapp.fake_webhook("hi", sender="<script>")
