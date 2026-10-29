@@ -29,6 +29,7 @@ from valerius.types import Message, OrderRecord  # noqa: E402
 def verify(store: act.Store, check_sig: bool = True) -> list[str]:
     problems: list[str] = []
     prev = "0" * 64
+    last_event: dict[str, str] = {}
     for i, r in enumerate(store.receipts(), 1):
         body = {k: v for k, v in r.items() if k not in ("hash", "sig")}
         if r.get("seq") != i:
@@ -55,8 +56,20 @@ def verify(store: act.Store, check_sig: bool = True) -> list[str]:
                           requested_action=case.get("requested_action", ""), amount_usd=case.get("amount_usd"), order=order)
             a = rules.check(msg)
             fired = sorted(f"{f.rule}:{f.risk.name}" for f in a.findings)
-            if a.floor.name != r["rules"]["floor"] or fired != r["rules"]["fired"]:
+            stored_incomplete = [x for x in r["rules"].get("incomplete", []) if not x.startswith("message longer than")]
+            if a.floor.name != r["rules"]["floor"] or fired != r["rules"]["fired"] or \
+                    list(a.incomplete) != stored_incomplete:
                 problems.append(f"receipt {i}: rerunning the rules gives a different result")
+            last_event[r["case_id"]] = r.get("event", "")
+
+    # Every case file's status must match the last receipt written for it.
+    for case_id, event in last_event.items():
+        case = store.load_case(case_id)
+        if case is not None and case.get("status") != event:
+            problems.append(f"case {case_id}: status '{case.get('status')}' has no matching receipt (last receipt: '{event}')")
+    for p in sorted((store.root / "cases").glob("*.json")):
+        if p.stem not in last_event:
+            problems.append(f"case {p.stem}: has no receipt at all")
     return problems
 
 

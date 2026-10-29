@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from . import judge as judge_mod
-from . import redact, rules
+from . import redact, rules, textnorm
 from .types import Assessment, Message, Risk
 
 # Public Muse Spark 1.3 Standard prices, USD per 1M tokens (dev.meta.ai/models, Oct 2026).
@@ -58,9 +58,12 @@ class Result:
 
 def run(msg: Message, *, use_models: bool = False,
         judge_chat: judge_mod.ChatFn | None = None, second_chat: judge_mod.ChatFn | None = None) -> Result:
-    clean_text, counts = redact.redact(msg.text)
+    normal, truncated = textnorm.normalize(msg.text)
+    clean_text, counts = redact.redact(normal)
     clean = replace(msg, text=clean_text)
     result = Result(message=clean, assessment=rules.check(clean), redactions=counts)
+    if truncated:
+        result.assessment.incomplete.append(f"message longer than {textnorm.MAX_CHARS} characters, only the start was checked")
     if use_models:
         result.first = judge_mod.judge(clean, result.assessment, judge_chat)
         result.second = judge_mod.second_pass(clean, result.assessment, result.first, second_chat)

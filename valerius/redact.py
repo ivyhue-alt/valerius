@@ -12,7 +12,7 @@ _EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
 _SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 _CARD = re.compile(r"\b(?:\d[ -]?){12,18}\d\b")
 _ACCOUNT = re.compile(
-    r"(?i)\b(account|acct|routing|iban|sort code|account number)(\s*(?:number|no\.?|#)?\s*[:#]?\s*)([A-Z]{0,4}\d[\d -]{4,30}\d)")
+    r"(?i)\b(account|acct|routing|iban|sort code|account number)(\s*(?:number|no\.?|#)?\s*(?:is\s+)?[:#]?\s*)([A-Z]{0,4}\d[\d -]{4,30}\d)")
 _CODE = re.compile(r"(?i)\b(code|otp|pin|passcode)(\s*(?:is|:|=)?\s*)(\d{4,8})\b")
 _PHONE = re.compile(r"(?<![\w$])\+?\d{0,3}[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b")
 
@@ -33,6 +33,9 @@ def _luhn_ok(digits: str) -> bool:
 def _last4(s: str) -> str:
     digits = re.sub(r"\D", "", s)
     return digits[-4:]
+
+
+_LONG_DIGITS = re.compile(r"(?<![\w$.,])\d(?:[ .-]?\d){8,18}(?![\w])")
 
 
 def redact(text: str) -> tuple[str, dict[str, int]]:
@@ -57,6 +60,10 @@ def redact(text: str) -> tuple[str, dict[str, int]]:
         bump("code")
         return f"{m.group(1)}{m.group(2)}[CODE]"
 
+    def long_digits(m: re.Match) -> str:
+        bump("number")
+        return f"[NUMBER ending {_last4(m.group(0))}]"
+
     def simple(kind: str, token: str):
         def f(m: re.Match) -> str:
             bump(kind)
@@ -69,4 +76,5 @@ def redact(text: str) -> tuple[str, dict[str, int]]:
     text = _ACCOUNT.sub(account, text)
     text = _CODE.sub(code, text)
     text = _PHONE.sub(simple("phone", "[PHONE]"), text)
+    text = _LONG_DIGITS.sub(long_digits, text)
     return text, counts

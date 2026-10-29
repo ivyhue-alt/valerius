@@ -27,23 +27,29 @@ def parse_webhook(payload: dict[str, Any], channel: str = Channel.FAMILY) -> lis
                 continue
             value = change.get("value", {})
             for m in value.get("messages", []) or []:
-                kind = m.get("type", "text")
+                if not isinstance(m, dict):
+                    continue
+                kind = str(m.get("type", "text"))
+                body = m.get(kind) if isinstance(m.get(kind), dict) else {}
                 text, media_id = "", ""
                 if kind == "text":
-                    text = m.get("text", {}).get("body", "")
-                elif kind in ("image", "document", "video"):
-                    media = m.get(kind, {})
-                    text = media.get("caption", "")
-                    media_id = media.get("id", "")
+                    text = body.get("body", "")
+                elif kind in ("image", "document", "video", "sticker"):
+                    text = body.get("caption", "")
+                    media_id = body.get("id", "")
                 elif kind == "audio":
-                    media_id = m.get("audio", {}).get("id", "")
-                ctx = m.get("context", {}) or {}
+                    media_id = body.get("id", "")
+                if kind == "text" and not isinstance(m.get("text"), dict):
+                    kind = "other"  # malformed: treat as unread, which holds
+                text = text if isinstance(text, str) else ""
+                media_id = media_id if isinstance(media_id, str) else ""
+                ctx = m.get("context") if isinstance(m.get("context"), dict) else {}
                 out.append(Message(
                     text=text,
                     channel=channel,
-                    sender=m.get("from", ""),
-                    conversation_id=m.get("id", ""),
-                    kind="audio" if kind == "audio" else ("image" if kind == "image" else ("document" if kind == "document" else "text")),
+                    sender=str(m.get("from", "")),
+                    conversation_id=str(m.get("id", "")),
+                    kind=kind if kind in ("text", "audio", "image", "document", "video") else "other",
                     forwarded=bool(ctx.get("forwarded") or ctx.get("frequently_forwarded")),
                     media_id=media_id,
                 ))

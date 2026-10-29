@@ -18,7 +18,12 @@ def load_env(path: Path = ROOT / ".env") -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]  # only a matching pair of quotes is removed
+        elif " #" in value:
+            value = value.split(" #", 1)[0].rstrip()  # inline comment
+        os.environ.setdefault(key.strip(), value)
 
 
 load_env()

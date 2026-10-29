@@ -17,7 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-FORBIDDEN_FILES = re.compile(r"(^|/)(\.env(\..*)?|webhook\.txt|.*\.pem|.*\.key)$")
+FORBIDDEN_FILES = re.compile(r"(^|/)(\.env(\..*)?|webhook\.txt|.*\.pem|.*\.key|.*\.bundle|.*\.sqlite|.*\.db)$|^(state|secrets|private|real_data)/")
 ALLOWED_FILES = {".env.example"}
 
 PATTERNS = [
@@ -60,6 +60,7 @@ def scan(files: list[str]) -> list[str]:
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
         except UnicodeDecodeError:
+            problems.append(f"{f}: not a text file, so it can't be scanned; check it by hand or remove it")
             continue
         for n, line in enumerate(lines, 1):
             if "secrets-check: allow" in line:

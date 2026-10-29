@@ -9,6 +9,8 @@ from html import escape
 
 from .config import SETTINGS
 
+TOKEN_KEYS = ("c", "p", "e", "n", "s")  # only these fields are ever copied from a link into a form
+
 CSS = """
 :root{--bg:#f7f6f3;--card:#fff;--ink:#1c1b19;--muted:#6b6862;--line:#e6e3dc;--hold:#b4232c;--ok:#1d7a46;--mark:#fde68a;--accent:#2b4c7e}
 @media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1f1e1c;--ink:#f1efe9;--muted:#a19d94;--line:#34322e;--hold:#ef6a70;--ok:#5cc28b;--mark:#7a5d0c;--accent:#8fb0e6}}
@@ -59,13 +61,13 @@ def _shell(title: str, body: str) -> str:
 def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
                   agent_token: dict[str, str] | None = None, agent_paused: bool = False) -> str:
     quotes: list[str] = []
-    for f in case["findings"]:
+    for f in case.get("findings", []):
         quotes += [e["quote"] for e in f["evidence"] if e.get("quote")]
     for mr in case.get("model_reasons", {}).values():
         quotes += mr.get("quotes", [])
 
-    held = case["status"] == "held"
-    status = f"<span class='pill{'' if held else ' ok'}'>{escape(case['status'].upper())}</span>"
+    held = case.get("status") == "held"
+    status = f"<span class='pill{'' if held else ' ok'}'>{escape(str(case.get('status', '?')).upper())}</span>"
     action = ""
     if case.get("requested_action"):
         amt = f" of ${case['amount_usd']:,.2f}" if case.get("amount_usd") is not None else ""
@@ -75,41 +77,41 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
         f"<li>{escape(f['reason'])} <span class='muted small'>({escape(f['rule'])}, {escape(f['risk'])})</span>"
         + "".join(f"<br><span class='small muted'>record: <code>{escape(e['field'])} = {escape(e['value'])}</code></span>"
                   for e in f["evidence"] if e.get("field"))
-        + "</li>" for f in case["findings"]) or "<li class=muted>No rule fired.</li>"
+        + "</li>" for f in case.get("findings", [])) or "<li class=muted>No rule fired.</li>"
     gaps = "".join(f"<li>Could not verify: {escape(g)}</li>" for g in case.get("unverified", []))
     models = "".join(
-        f"<li><b>{escape(src)}</b>: {escape(case['models'].get(src, ''))} &middot; {escape('; '.join(mr.get('reasons', [])))}</li>"
+        f"<li><b>{escape(src)}</b>: {escape(case.get('models', {}).get(src, ''))} &middot; {escape('; '.join(mr.get('reasons', [])))}</li>"
         for src, mr in case.get("model_reasons", {}).items())
     disagree = "<p><b>The two model reviews disagree, so a person decides.</b></p>" if case.get("disagreement") else ""
     paused = "<p><b>The agent is paused.</b> Every requested action is held until you resume it.</p>" if case.get("paused_agent") else ""
 
     policy = ""
-    if case["channel"] == "business":
+    if case.get("channel") == "business":
         lines = "".join(f"<li>{escape(x)}</li>" for x in SETTINGS.policy.lines())
         policy = f"<h2>Your rules ({escape(SETTINGS.policy.business_name)})</h2><div class=card><ul>{lines}</ul></div>"
 
     buttons = ""
     if held:
-        hidden = "".join(f"<input type=hidden name='{escape(k)}' value='{escape(v)}'>" for k, v in token.items())
-        buttons = (f"<form method=post action='/case/{escape(case['id'])}/decide'>{hidden}<div class=row>"
+        hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(token.get(k, '')))}'>" for k in TOKEN_KEYS)
+        buttons = (f"<form method=post action='/case/{escape(str(case.get('id', '')))}/decide'>{hidden}<div class=row>"
                    "<button class=approve name=decision value=approve>Approve</button>"
                    "<button class=block name=decision value=block>Block</button></div></form>"
                    "<p class='small muted'>This link works once and expires in 2 hours. Nothing happens until you choose.</p>")
 
     track = (f"<p class='small muted'>This agent so far: {record['held']} held, {record['approved']} approved, "
-             f"{record['blocked']} blocked.</p>") if case["channel"] == "business" else ""
+             f"{record['blocked']} blocked.</p>") if case.get("channel") == "business" else ""
 
     switch = ""
-    if case["channel"] == "business" and agent_token:
-        hidden = "".join(f"<input type=hidden name='{escape(k)}' value='{escape(v)}'>" for k, v in agent_token.items())
+    if case.get("channel") == "business" and agent_token:
+        hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(agent_token.get(k, '')))}'>" for k in TOKEN_KEYS)
         verb, path = ("Resume agent", "resume") if agent_paused else ("Pause agent", "pause")
         note = ("The agent is paused: every requested action is held." if agent_paused
                 else "Something wrong? Pausing holds every action the agent asks for until you resume it.")
         switch = (f"<h2>Agent</h2><div class=card><p class=small>{escape(note)}</p>"
                   f"<form method=post action='/agent/{path}'>{hidden}<button class=block>{verb}</button></form></div>")
 
-    body = (f"<h1>Valerius review {status}</h1><p class=muted>Risk: <b>{escape(case['risk'])}</b> &middot; case {escape(case['id'])}</p>"
-            f"{paused}{action}<h2>The message</h2><div class='card msg'>{_highlight(case['text'], quotes)}</div>"
+    body = (f"<h1>Valerius review {status}</h1><p class=muted>Risk: <b>{escape(str(case.get('risk', '?')))}</b> &middot; case {escape(str(case.get('id', '')))}</p>"
+            f"{paused}{action}<h2>The message</h2><div class='card msg'>{_highlight(case.get('text', ''), quotes)}</div>"
             f"<h2>Why it was held</h2><div class=card><ul>{rules}{gaps}</ul></div>"
             + (f"<h2>Model reviews</h2><div class=card>{disagree}<ul>{models}</ul></div>" if models or disagree else "")
             + f"{policy}{buttons}{track}{switch}"

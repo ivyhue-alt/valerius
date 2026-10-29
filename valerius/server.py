@@ -1,7 +1,8 @@
 """Web server: WhatsApp webhook, approval pages, and the pause switch. Standard library only.
 
-    python -m valerius.server            # http://localhost:8080
+    python -m valerius.server            # http://localhost:8080, this computer only
     PORT=9000 python -m valerius.server
+    HOST=0.0.0.0 python -m valerius.server   # reachable from outside; needs WHATSAPP_APP_SECRET
 
 Routes
     GET  /health
@@ -20,6 +21,9 @@ import json
 import os
 import re
 import sys
+import threading
+import time
+from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -28,6 +32,28 @@ from .config import SETTINGS
 from .types import Risk
 
 STORE = act.Store()
+MAX_BODY = 1_000_000
+_SENDER = re.compile(r"\d{8,15}")
+
+# Rate limits so nobody can run up model costs: per sender and overall, per minute.
+PER_SENDER_PER_MIN = 10
+GLOBAL_PER_MIN = 120
+_hits: dict[str, deque] = defaultdict(deque)
+_hits_lock = threading.Lock()
+
+
+def _allowed(sender: str, now: float | None = None) -> bool:
+    now = time.monotonic() if now is None else now
+    with _hits_lock:
+        for key, cap in ((f"s:{sender}", PER_SENDER_PER_MIN), ("all", GLOBAL_PER_MIN)):
+            q = _hits[key]
+            while q and now - q[0] > 60:
+                q.popleft()
+            if len(q) >= cap:
+                return False
+        _hits[f"s:{sender}"].append(now)
+        _hits["all"].append(now)
+        return True
 
 
 def _flat(qs: dict[str, list[str]]) -> dict[str, str]:
@@ -39,17 +65,29 @@ def handle_incoming(payload: dict, store: act.Store = STORE, use_models: bool | 
     live = SETTINGS.server_live if use_models is None else use_models
     done = []
     for msg in whatsapp.parse_webhook(payload):
-        result = pipeline.run(msg, use_models=live)
-        case = act.open_case(result, store)
-        reply = act.family_reply(result)
-        sent = [whatsapp.send_text(msg.sender, reply)]
-        contact = SETTINGS.trusted_contact
-        if contact and contact != msg.sender and result.risk >= Risk.HIGH:
-            alert = ("Valerius: a message sent to your family member looks like a scam "
-                     f"({result.risk.name}). Details: {case.get('link', '')}")
-            sent.append(whatsapp.send_text(contact, alert))
-        done.append({"case": case["id"], "status": case["status"], "risk": case["risk"], "sent": sent})
+        try:
+            done.append(_handle_one(msg, store, live))
+        except Exception as e:  # one bad message must not break the rest or make Meta retry
+            sys.stderr.write(f"error handling message: {type(e).__name__}\n")
+            done.append({"error": type(e).__name__})
     return done
+
+
+def _handle_one(msg, store: act.Store, live: bool) -> dict:
+    if not _SENDER.fullmatch(msg.sender or ""):
+        return {"skipped": "sender is not a valid phone number"}
+    if not _allowed(msg.sender):
+        return {"skipped": "rate limited"}
+    result = pipeline.run(msg, use_models=live)
+    case = act.open_case(result, store)
+    reply = act.family_reply(result)
+    sent = [whatsapp.send_text(msg.sender, reply)]
+    contact = SETTINGS.trusted_contact
+    if contact and contact != msg.sender and result.risk >= Risk.HIGH:
+        alert = ("Valerius: a message sent to your family member looks like a scam "
+                 f"({result.risk.name}). Details: {case.get('link', '')}")
+        sent.append(whatsapp.send_text(contact, alert))
+    return {"case": case["id"], "status": case["status"], "risk": case["risk"], "sent": sent}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -62,16 +100,25 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'")
+        self.send_header("Content-Security-Policy",
+                         "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
         self.end_headers()
         self.wfile.write(data)
 
     def log_message(self, fmt: str, *args) -> None:  # keep tokens out of logs
         sys.stderr.write(f"{self.command} {urlparse(self.path).path} -> {args[1] if len(args) > 1 else ''}\n")
 
-    def _body(self) -> bytes:
-        n = int(self.headers.get("Content-Length", "0") or 0)
-        return self.rfile.read(min(n, 1_000_000))
+    def _body(self) -> bytes | None:
+        try:
+            n = int(self.headers.get("Content-Length", "0") or 0)
+        except ValueError:
+            n = -1
+        if n < 0 or n > MAX_BODY:
+            self.close_connection = True
+            return None
+        return self.rfile.read(n)
 
     # ---------------------------------------------------------------- GET
     def do_GET(self) -> None:
@@ -87,15 +134,18 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/case/([a-f0-9]{12})", u.path)
         if m:
             case = STORE.load_case(m.group(1))
-            if case is None:
-                return self._send(404, page.result_page("Not found", "This review does not exist."))
-            if case["status"] == "held":
-                why = act.check_token(q, case["used_nonces"])
-                if why or q.get("c") != case["id"]:
-                    return self._send(403, page.result_page("Link not valid", why or "This link is for a different review."))
-            else:
+            not_found = page.result_page("Link not valid", "This link is not valid or has expired.")
+            if case is None or q.get("c") != case.get("id"):
+                return self._send(404, not_found)
+            if case.get("status") != "held":
+                # Only someone holding a genuine link learns that a case was decided.
+                if act.check_token(q, [], purpose="decide", check_used=False, check_expiry=False):
+                    return self._send(404, not_found)
                 return self._send(200, page.result_page(f"Already {case['status']}",
                                                         "This review has been decided. A signed receipt was recorded."))
+            why = act.check_token(q, case.get("used_nonces", []), purpose="decide")
+            if why:
+                return self._send(403, page.result_page("Link not valid", why))
             agent = STORE.agent()
             return self._send(200, page.approval_page(case, q, act.track_record(STORE),
                                                       act.agent_token(), bool(agent.get("paused"))))
@@ -105,7 +155,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         u = urlparse(self.path)
         raw = self._body()
+        if raw is None:
+            return self._send(413, "too large", "text/plain")
         if u.path == "/webhook":
+            if not SETTINGS.whatsapp_app_secret and not _loopback(self.server.server_address[0]):
+                return self._send(403, "webhook signature required", "text/plain")
             if SETTINGS.whatsapp_app_secret:
                 sig = self.headers.get("X-Hub-Signature-256", "")
                 good = "sha256=" + hmac.new(SETTINGS.whatsapp_app_secret.encode(), raw, hashlib.sha256).hexdigest()
@@ -115,7 +169,8 @@ class Handler(BaseHTTPRequestHandler):
                 payload = json.loads(raw.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError):
                 return self._send(400, "bad json", "text/plain")
-            handle_incoming(payload)
+            if isinstance(payload, dict):
+                handle_incoming(payload)
             return self._send(200, "ok", "text/plain")  # always 200 so Meta does not retry storms
         form = _flat(parse_qs(raw.decode("utf-8", "replace")))
         m = re.fullmatch(r"/case/([a-f0-9]{12})/decide", u.path)
@@ -134,9 +189,18 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, "not found", "text/plain")
 
 
-def serve(port: int | None = None) -> ThreadingHTTPServer:
+def _loopback(host: str) -> bool:
+    return host in ("127.0.0.1", "::1", "localhost")
+
+
+def serve(port: int | None = None, host: str | None = None) -> ThreadingHTTPServer:
+    """Listens on this computer only unless HOST says otherwise. Going online requires the app secret,
+    so webhooks that don't come from Meta are refused."""
     port = port if port is not None else int(os.environ.get("PORT", "8080"))
-    return ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    host = host or os.environ.get("HOST", "127.0.0.1")
+    if not _loopback(host) and not SETTINGS.whatsapp_app_secret:
+        raise SystemExit("Refusing to listen on a public address without WHATSAPP_APP_SECRET set in .env.")
+    return ThreadingHTTPServer((host, port), Handler)
 
 
 if __name__ == "__main__":

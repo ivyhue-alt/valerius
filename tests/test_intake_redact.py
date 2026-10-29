@@ -11,9 +11,10 @@ class Redaction(unittest.TestCase):
         self.assertNotIn("4111 1111", out)
         self.assertEqual(counts["card"], 1)
 
-    def test_non_luhn_number_left_alone(self):
+    def test_other_long_numbers_keep_only_last4(self):
         out, _ = redact.redact("order 1234 5678 9012 3456 shipped")
-        self.assertIn("1234 5678 9012 3456", out)
+        self.assertIn("[NUMBER ending 3456]", out)
+        self.assertNotIn("1234 5678", out)
 
     def test_ssn_email_phone(self):
         out, counts = redact.redact("SSN 123-45-6789, mail me at a.b@example.com or call (555) 010-2030")

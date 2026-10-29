@@ -27,6 +27,8 @@ from urllib.parse import urlencode
 
 from .config import ROOT, SETTINGS
 from .pipeline import Result
+from .rules import implied_actions
+from .textnorm import scrub_model_text
 from .types import Risk
 
 STATE = ROOT / "state"           # gitignored runtime state
@@ -101,7 +103,7 @@ class Store:
 
 
 def sign(case_id: str, purpose: str, ttl_s: int = 7200, now: int | None = None) -> dict[str, str]:
-    exp = (now or int(time.time())) + ttl_s
+    exp = (now if now is not None else int(time.time())) + ttl_s
     nonce = secrets.token_hex(8)
     body = f"{case_id}|{purpose}|{exp}|{nonce}"
     sig = hmac.new(_secret(), body.encode(), hashlib.sha256).hexdigest()
@@ -112,7 +114,8 @@ def link(token: dict[str, str]) -> str:
     return f"{SETTINGS.approval_base_url}/case/{token['c']}?{urlencode(token)}"
 
 
-def check_token(t: dict[str, str], used: list[str], now: int | None = None) -> str:
+def check_token(t: dict[str, str], used: list, now: int | None = None, purpose: str | None = None,
+                check_used: bool = True, check_expiry: bool = True) -> str:
     """Return "" if valid, otherwise the reason it is not."""
     try:
         body = f"{t['c']}|{t['p']}|{t['e']}|{t['n']}"
@@ -122,9 +125,12 @@ def check_token(t: dict[str, str], used: list[str], now: int | None = None) -> s
     good = hmac.new(_secret(), body.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(good, t.get("s", "")):
         return "link signature is not valid"
-    if (now or int(time.time())) > exp:
+    if purpose is not None and t.get("p") != purpose:
+        return "link is for a different purpose"
+    if check_expiry and (now if now is not None else int(time.time())) > exp:
         return "link has expired"
-    if t["n"] in used:
+    used_nonces = {u[0] if isinstance(u, (list, tuple)) else u for u in used}
+    if check_used and t["n"] in used_nonces:
         return "link was already used"
     return ""
 
@@ -152,7 +158,9 @@ def open_case(result: Result, store: Store) -> dict:
     msg = result.message
     agent = store.agent()
     paused = bool(agent.get("paused")) and msg.channel == "business"
-    hold = result.hold or (paused and bool(msg.requested_action))
+    # When paused, anything that looks like an action is held, even if the agent left the action field blank.
+    asks_for_action = bool(msg.requested_action) or bool(implied_actions(msg.text)) or msg.amount_usd is not None
+    hold = result.hold or (paused and asks_for_action)
     case = {
         "id": uuid.uuid4().hex[:12],
         "created_at": int(time.time()),
@@ -167,7 +175,8 @@ def open_case(result: Result, store: Store) -> dict:
         "models": _model_record(result),
         "findings": [{"rule": f.rule, "risk": f.risk.name, "reason": f.reason,
                       "evidence": [asdict(e) for e in f.evidence]} for f in result.assessment.findings],
-        "model_reasons": {v.source: {"reasons": v.reasons, "quotes": v.quotes, "advice": v.advice}
+        "model_reasons": {v.source: {"reasons": [scrub_model_text(r) for r in v.reasons], "quotes": v.quotes,
+                                     "advice": scrub_model_text(v.advice)}
                           for v in (result.first, result.second) if v is not None and v.ok},
         "unverified": result.unverified,
         "disagreement": result.disagreement,
@@ -195,7 +204,7 @@ def decide(case_id: str, token: dict[str, str], decision: str, store: Store, act
             return False, "case not found"
         if case["status"] != "held":
             return False, f"this case is already {case['status']}"
-        why = check_token(token, case["used_nonces"])
+        why = check_token(token, case["used_nonces"], purpose="decide")
         if why:
             return False, why
         case["used_nonces"].append(token["n"])
@@ -226,22 +235,24 @@ def track_record(store: Store) -> dict[str, int]:
 
 
 def family_reply(result: Result) -> str:
-    """Plain-language answer for a person who forwarded something to Valerius Family."""
+    """Plain-language answer for a person who forwarded something to Valerius Family.
+
+    Built only from fixed wording and the rules' own reasons. Model-written text never goes
+    into a reply, so a crafted message can't make Valerius send someone a scammer's link."""
     reasons: list[str] = []
     for f in result.assessment.findings:
         if f.reason not in reasons:
             reasons.append(f.reason)
-    if result.first is not None and result.first.ok:
-        reasons += [r for r in result.first.reasons if r not in reasons]
-    why = "; ".join(reasons[:3])
+    why = "; ".join(reasons[:3]) or "it has signs of a scam"
     if result.unverified and result.risk < Risk.HIGH:
         return ("I couldn't fully check this one, so treat it as unsafe for now. Don't send money, codes or "
                 "personal details until someone you trust has looked at it.")
     if result.risk >= Risk.HIGH:
         return ("This looks like a scam. Don't send money, gift cards or codes, and don't tap any links. "
-                f"Why: {why}. If it claims to be family, call them on the number you already have.")
+                f"Why: {why}. If it claims to be family, call them on the number you already have. "
+                "You can report scams at reportfraud.ftc.gov.")
     if result.risk == Risk.MEDIUM:
-        return f"Be careful with this one. {why}. Check with someone you trust before you act."
+        return f"Be careful with this one. Why: {why}. Check with someone you trust before you act."
     return "I didn't find common scam signs. Still, never share codes or send money to someone you haven't verified."
 
 
@@ -264,10 +275,13 @@ def switch_agent(paused: bool, token: dict[str, str], store: Store, actor: str =
         state = store.agent()
         if token.get("c") != "agent" or token.get("p") != "agent":
             return False, "link is not an agent control link"
-        why = check_token(token, state.get("used_nonces", []))
+        why = check_token(token, state.get("used_nonces", []), purpose="agent")
         if why:
             return False, why
-        used = state.get("used_nonces", []) + [token["n"]]
-        store.set_agent({"paused": paused, "by": actor, "at": int(time.time()), "used_nonces": used[-200:]})
+        now = int(time.time())
+        # Keep every nonce until its link would have expired anyway, so no unexpired link can be replayed.
+        kept = [u for u in state.get("used_nonces", []) if isinstance(u, list) and int(u[1]) >= now]
+        kept.append([token["n"], int(token["e"])])
+        store.set_agent({"paused": paused, "by": actor, "at": now, "used_nonces": kept})
     store.append_receipt({"event": "paused" if paused else "resumed", "case_id": "", "actor": actor})
     return True, "paused" if paused else "resumed"

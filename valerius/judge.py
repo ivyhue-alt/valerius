@@ -128,7 +128,14 @@ def parse(content: str, message_text: str, source: str) -> Verdict:
         return v
     v.risk = risk
     v.category = str(data.get("category", ""))[:60]
-    v.reasons = [str(r)[:200] for r in (data.get("reasons") or [])][:3]
+    reasons = data.get("reasons") or []
+    if isinstance(reasons, str):
+        reasons = [reasons]
+    v.reasons = [str(r)[:200] for r in reasons if isinstance(r, (str, int, float))][:3]
+    quotes = data.get("quotes") or []
+    if isinstance(quotes, str):
+        quotes = [quotes]
+    data["quotes"] = quotes
     v.advice = str(data.get("advice", ""))[:240]
     for q in data.get("quotes") or []:
         q = str(q)
@@ -144,11 +151,6 @@ def _from_reply(reply: llm.Reply, message_text: str, source: str) -> Verdict:
     return v
 
 
-def default_judge_chat(messages: list[dict[str, str]]) -> llm.Reply:
-    return llm.chat(SETTINGS.model_base_url, SETTINGS.model_api_key, SETTINGS.judge_model, messages,
-                    extra={"temperature": 0})
-
-
 VERDICT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -161,6 +163,17 @@ VERDICT_SCHEMA = {
     "required": ["risk", "category", "reasons", "quotes", "advice"],
     "additionalProperties": False,
 }
+
+
+def default_judge_chat(messages: list[dict[str, str]]) -> llm.Reply:
+    schema = {"type": "json_schema", "json_schema": {"name": "verdict", "schema": VERDICT_SCHEMA, "strict": True}}
+    reply = llm.chat(SETTINGS.model_base_url, SETTINGS.model_api_key, SETTINGS.judge_model, messages,
+                     extra={"temperature": 0, "response_format": schema})
+    if reply.error.startswith("HTTP 400") and "response_format" in reply.error:
+        # If the API rejects the schema option, ask once without it; the parser still validates the reply.
+        reply = llm.chat(SETTINGS.model_base_url, SETTINGS.model_api_key, SETTINGS.judge_model, messages,
+                         extra={"temperature": 0})
+    return reply
 
 
 def default_second_chat(messages: list[dict[str, str]]) -> llm.Reply:

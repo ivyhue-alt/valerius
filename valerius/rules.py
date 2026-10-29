@@ -32,15 +32,17 @@ def _rec(field_name: str, value) -> Evidence:
     return Evidence(field=field_name, value=str(value))
 
 
-_AMOUNT = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{2})?|\b(\d+(?:,\d{3})*)\s?(?:dollars|usd)\b", re.I)
+_AMOUNT = re.compile(r"\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?|\b(\d+(?:,\d{3})*)(?:\.(\d{1,2}))?\s?(?:dollars|usd)\b", re.I)
 
 
 def amounts(text: str) -> list[float]:
+    """Dollar amounts in the text, cents included ($50.99 is 50.99, not 50)."""
     vals = []
     for m in _AMOUNT.finditer(text):
-        raw = (m.group(1) or m.group(2) or "").replace(",", "")
-        if raw:
-            vals.append(float(raw))
+        whole = (m.group(1) or m.group(3) or "").replace(",", "")
+        cents = m.group(2) or m.group(4) or "0"
+        if whole:
+            vals.append(float(f"{whole}.{cents.ljust(2, '0')}"))
     return vals
 
 
@@ -95,7 +97,6 @@ PRESSURE_STORY = [r"\b(?:my (?:mom|mother|dad|father|kid|child|son|daughter|wife
                   r"\bplease,? i really need\b", r"\bhospital\b", r"\bevicted\b"]
 EXCEPTION_ASK = [r"\bdiscount\b", r"\bexception\b", r"\bjust this once\b", r"\bwaive\b", r"\bfree replacement\b",
                  r"\bfull refund\b", r"\bkeep (?:it|the item) and\b", r"\bcredit (?:my|the) account\b"]
-REFUND_WORDS = [r"\brefund\b", r"\bmoney back\b", r"\breimburse\b", r"\bchargeback\b", r"\breturn\b"]
 
 
 # ---------------------------------------------------------------- family / shared rules
@@ -146,6 +147,26 @@ def _shared_rules(msg: Message) -> list[Finding]:
 # invented action) is blocked outright, never passed through.
 ALLOWED_ACTIONS = frozenset({"", "refund", "cancel", "payment_change", "account_change"})
 
+# The same actions as they appear in a customer's words. The agent's action field can be
+# blank or wrong, so the text is checked too and the stricter reading wins.
+ACTION_WORDS = {
+    "refund": [r"\brefund", r"\bmoney back\b", r"\breimburse", r"\bchargeback\b", r"\breturn\b"],
+    "cancel": [r"\bcancel", r"\bstop (?:my|the) (?:order|subscription|plan)\b", r"\bunsubscribe\b"],
+    "payment_change": [r"\b(?:change|update|switch|replace) (?:the |my )?(?:card|payment|billing|bank|payout)",
+                       r"\bnew card\b", r"\bcard on file\b", r"\bpayout (?:account|details)\b"],
+    "account_change": [r"\b(?:change|update|reset) (?:the |my )?(?:email|password|phone number|login|username|address on (?:my|the) account)",
+                       r"\breset link\b", r"\badd (?:a |another )?(?:user|admin)\b"],
+}
+
+
+def implied_actions(text: str) -> dict[str, Evidence]:
+    """Actions the customer's words ask for, with the words that show it."""
+    found = {}
+    for action, pats in ACTION_WORDS.items():
+        if (e := _search(pats, text)):
+            found[action] = e
+    return found
+
 
 def _business_rules(msg: Message, policy: PolicyCard) -> tuple[list[Finding], list[str]]:
     t = msg.text
@@ -153,17 +174,27 @@ def _business_rules(msg: Message, policy: PolicyCard) -> tuple[list[Finding], li
     incomplete: list[str] = []
     o = msg.order
     action = msg.requested_action
-    amt = msg.amount_usd if msg.amount_usd is not None else (max(amounts(t)) if amounts(t) else None)
+    implied = implied_actions(t)
+    text_amts = amounts(t)
+    text_amt = max(text_amts) if text_amts else None
+    # Trust the stricter number: an agent that says $10 while the customer wrote $1,200 doesn't get the $10.
+    candidates = [a for a in (msg.amount_usd, text_amt) if a is not None]
+    amt = max(candidates) if candidates else None
+    if msg.amount_usd is not None and text_amt is not None and text_amt > msg.amount_usd + 0.5:
+        out.append(Finding("amount_mismatch", Risk.HIGH,
+                           f"the agent's amount (${msg.amount_usd:,.2f}) is lower than the amount in the message (${text_amt:,.2f})",
+                           [_rec("amount_usd", f"{msg.amount_usd:,.2f}"), _rec("amount_in_message", f"{text_amt:,.2f}")]))
 
     if action not in ALLOWED_ACTIONS:
         out.append(Finding("unknown_action", Risk.CRITICAL,
                            "the agent asked for an action that is not on the owner's list, so it is blocked",
                            [_rec("requested_action", action)]))
-    if action in policy.always_ask:
-        out.append(Finding("owner_approval_required", Risk.HIGH,
-                           f"the owner's policy says a {action.replace('_', ' ')} always needs approval",
-                           [_rec("requested_action", action)]))
-    if action == "refund" or _search(REFUND_WORDS, t):
+    for act in policy.always_ask:
+        if action == act or act in implied:
+            ev = [_rec("requested_action", action)] if action == act else [implied[act]]
+            out.append(Finding("owner_approval_required", Risk.HIGH,
+                               f"the owner's policy says a {act.replace('_', ' ')} always needs approval", ev))
+    if action == "refund" or "refund" in implied:
         if amt is None:
             if action == "refund":
                 incomplete.append("refund amount unknown")
@@ -245,7 +276,7 @@ def check(msg: Message, policy: PolicyCard | None = None) -> Assessment:
     if msg.channel == Channel.BUSINESS:
         biz, incomplete = _business_rules(msg, policy)
         findings += biz
-    if msg.kind in ("image", "audio", "document"):
+    if msg.kind in ("image", "audio", "document", "video", "other"):
         # A caption is not the content. Until SAM or transcription has read the media, it is unverified.
         incomplete.append(f"{msg.kind} not yet read")
     floor = max((f.risk for f in findings), default=Risk.LOW)
