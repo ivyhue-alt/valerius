@@ -1,0 +1,27 @@
+{
+  "P036": {
+    "file": "P036.webp",
+    "model": "muse-image-1.0",
+    "sha256": "44338afcc8773561caa70689a5f6b824726586052da6be599563ff35d714cd4e"
+  },
+  "P040": {
+    "file": "P040.webp",
+    "model": "muse-image-1.0",
+    "sha256": "6e6623436a2c1829189123629dd0e1bd72b93680c85f55e2dcf1128d3f8d4513"
+  },
+  "P058": {
+    "file": "P058.webp",
+    "model": "muse-image-1.0",
+    "sha256": "391a3f3eb91300680e8d6b7ba615eb07c9dee8c3d53fa8c6ea74fad0f4673111"
+  },
+  "P065": {
+    "file": "P065.webp",
+    "model": "muse-image-1.0",
+    "sha256": "dafaa8e20f4a3d506910c6df3c033bcc5d2639fc2c25e1a0375057c32c13f199"
+  },
+  "P100": {
+    "file": "P100.webp",
+    "model": "muse-image-1.0",
+    "sha256": "30bcfc014a4283fbf531ce8384f7c4d02cf20c3a4b02965939880a1792f36b38"
+  }
+}
