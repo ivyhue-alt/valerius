@@ -72,6 +72,7 @@ class Settings:
     graph_api_version: str = field(default_factory=lambda: _env("GRAPH_API_VERSION", "v26.0"))
     whatsapp_app_secret: str = field(default_factory=lambda: _env("WHATSAPP_APP_SECRET"))
     trusted_contact: str = field(default_factory=lambda: _env("TRUSTED_CONTACT"))  # opted-in family number
+    intake_code: str = field(default_factory=lambda: _env("INTAKE_CODE"))  # access code for the web intake page
     server_live: bool = field(default_factory=lambda: _env("SERVER_LIVE", "1") == "1")  # call models from the server
 
     signing_secret: str = field(default_factory=lambda: _env("SIGNING_SECRET"))

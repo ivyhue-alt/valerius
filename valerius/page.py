@@ -141,3 +141,29 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
 
 def result_page(title: str, detail: str) -> str:
     return _shell(title, f"<h1>{escape(title)}</h1><p>{escape(detail)}</p>")
+
+
+def intake_form(error: str = "") -> str:
+    err = f"<p class=card style='border-color:var(--hold)'><b>{escape(error)}</b></p>" if error else ""
+    body = (
+        "<h1>Is this a scam?</h1><p class=muted>Paste a message you received, or add a screenshot or voice note. "
+        "Valerius checks it and tells you what it found.</p>" + err +
+        "<form method=post action='/check' enctype='multipart/form-data'>"
+        "<h2>The message</h2><textarea name=text rows=6 maxlength=4000 "
+        "style='width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)'></textarea>"
+        "<h2>Screenshot or voice note (optional)</h2>"
+        "<input type=file name=file accept='image/jpeg,image/png,image/webp,audio/*'>"
+        "<h2>Access code</h2><input name=code type=password autocomplete=off required "
+        "style='width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)'>"
+        "<div class=row><button class=approve>Check it</button></div></form>"
+        "<p class='small muted'>Personal details are removed before review. Use made-up or test messages only.</p>")
+    return _shell("Valerius check", body)
+
+
+def intake_result(risk: str, held: bool, reply: str, link: str = "") -> str:
+    pill = f"<span class='pill{'' if held else ' ok'}'>{escape(risk)}</span>"
+    review = (f"<p><a href='{escape(link)}'>Open the review</a> to see the evidence and approve or block. "
+              "The link works once and expires in 2 hours.</p>") if held and link else ""
+    body = (f"<h1>Valerius says {pill}</h1><div class=card><p>{escape(reply)}</p></div>{review}"
+            "<p><a href='/check'>Check another message</a></p>")
+    return _shell("Valerius check", body)

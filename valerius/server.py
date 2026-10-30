@@ -27,9 +27,9 @@ from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import act, page, pipeline, whatsapp
+from . import act, intake, page, pipeline, whatsapp
 from .config import SETTINGS
-from .types import Risk
+from .types import Channel, Message, Risk
 
 STORE = act.Store()
 MAX_BODY = 1_000_000
@@ -117,6 +117,23 @@ def _handle_one(msg, store: act.Store, live: bool) -> dict:
     return {"case": case["id"], "status": case["status"], "risk": case["risk"], "sent": sent}
 
 
+def handle_check(text: str, data: bytes, store: act.Store = STORE, live: bool | None = None) -> tuple[int, str]:
+    """Run one web-forwarded message through the loop. Returns (status, html)."""
+    live = SETTINGS.server_live if live is None else live
+    kind, mime = ("text", "")
+    if data:
+        kind, mime = intake.sniff(data)
+        if not kind:
+            return 400, page.intake_form("That file type isn't supported. Use a JPEG, PNG or WEBP image, or a voice note.")
+    if not text.strip() and not data:
+        return 400, page.intake_form("Paste a message or add a file.")
+    msg = Message(text=text[:intake.MAX_TEXT], channel=Channel.FAMILY, kind=kind, sender="web", forwarded=True)
+    result = pipeline.run(msg, use_models=live, media=data or None, media_mime=mime)
+    case = act.open_case(result, store)
+    sys.stderr.write(f"case {case['id']}: {case['risk']} {case['status']} kind={kind} via=web\n")
+    return 200, page.intake_result(result.risk.name, case["status"] == "held", act.family_reply(result), case.get("link", ""))
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "Valerius"
 
@@ -137,12 +154,12 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:  # keep tokens out of logs
         sys.stderr.write(f"{self.command} {urlparse(self.path).path} -> {args[1] if len(args) > 1 else ''}\n")
 
-    def _body(self) -> bytes | None:
+    def _body(self, limit: int = MAX_BODY) -> bytes | None:
         try:
             n = int(self.headers.get("Content-Length", "0") or 0)
         except ValueError:
             n = -1
-        if n < 0 or n > MAX_BODY:
+        if n < 0 or n > limit:
             self.close_connection = True
             return None
         return self.rfile.read(n)
@@ -153,6 +170,8 @@ class Handler(BaseHTTPRequestHandler):
         q = _flat(parse_qs(u.query))
         if u.path == "/health":
             return self._send(200, "ok", "text/plain")
+        if u.path == "/check" and SETTINGS.intake_code:
+            return self._send(200, page.intake_form())
         if u.path == "/webhook":
             if q.get("hub.mode") == "subscribe" and SETTINGS.whatsapp_verify_token and \
                     hmac.compare_digest(q.get("hub.verify_token", ""), SETTINGS.whatsapp_verify_token):
@@ -178,9 +197,23 @@ class Handler(BaseHTTPRequestHandler):
                                                       act.agent_token(), bool(agent.get("paused"))))
         return self._send(404, "not found", "text/plain")
 
+    def _check(self) -> None:
+        raw = self._body(intake.MAX_UPLOAD)
+        if raw is None:
+            return self._send(413, page.intake_form("That file is too large (12 MB at most)."))
+        if not _allowed("web"):  # counts wrong codes too, so the code can't be guessed quickly
+            return self._send(429, page.intake_form("Too many checks right now. Try again in a minute."))
+        form = intake.parse_form(raw, self.headers.get("Content-Type", ""))
+        if not intake.code_ok(form.get("code", b"").decode("utf-8", "replace")):
+            return self._send(403, page.intake_form("That access code isn't right."))
+        status, html = handle_check(form.get("text", b"").decode("utf-8", "replace"), form.get("file", b""), STORE)
+        return self._send(status, html)
+
     # ---------------------------------------------------------------- POST
     def do_POST(self) -> None:
         u = urlparse(self.path)
+        if u.path == "/check" and SETTINGS.intake_code:
+            return self._check()
         raw = self._body()
         if raw is None:
             return self._send(413, "too large", "text/plain")

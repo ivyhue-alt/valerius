@@ -25,10 +25,33 @@ python scripts/evaluate.py [--live]                  # benchmark, practice rows
 python scripts/demo_business.py [--live]             # Shift Lead: fake owner asks for a $1,200 refund
 python scripts/demo_business.py --serial             # Shift Lead: same customer's third damage claim in 40 days
 python scripts/run_scenarios.py                      # repeat-claims scenarios (reported separately)
-python -m valerius.server                            # webhook + approval pages on :8080
+python -m valerius.server                            # webhook, web intake (/check) and approval pages on :8080
+modal deploy deploy/modal_app.py                     # put it online (keys come from your .env as a Modal Secret)
 python scripts/verify_receipts.py                    # check every decision without trusting a model
 python scripts/check_secrets.py
 ```
+
+## What runs where
+
+Every model Valerius calls at runtime is a Meta model.
+
+| Step | What does it | Kind |
+|---|---|---|
+| Judge the message (verdict, reasons, quotes) | Muse Spark 1.3, Meta Model API | Meta model call |
+| Second pass that argues the opposite | Muse Spark Open, hosted on Baseten | Meta model call (same family, so it is a second opinion, not an independent review) |
+| Read fixed fields from an image | Muse Spark (image input) | Meta model call |
+| Locate logo, total, QR code, bank details in an image | SAM 3.1, Meta Model API | Meta model call |
+| Voice note to text | Muse Voice Transcribe | Meta model call |
+| Rules, redaction, holds, links, receipts | Python standard library | No model |
+| Voice note format conversion (OGG to WAV) | ffmpeg | No model |
+| Test images for the benchmark | Muse Image | Meta model call, test data only |
+| Test voice file | Windows built-in speech | OS feature, test data only |
+
+Valerius never speaks: there is no text-to-speech.
+
+## WhatsApp, and the web intake page
+
+The WhatsApp webhook is built and tested against Meta's webhook format, with signature checks, duplicate handling and media download. Delivering real WhatsApp messages needs Meta business verification and an app in Live mode, which a solo hackathon test number doesn't have. So people can also forward a message, screenshot or voice note through the web intake page (`/check`, behind an access code). It runs exactly the same loop: rules, both model reviews, hold, signed review link and receipt.
 
 ## How a held action works
 
