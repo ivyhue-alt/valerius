@@ -44,11 +44,43 @@ def to_message(row: dict) -> Message:
                    order=order, conversation_id=row["id"])
 
 
+class _Tee:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, text):
+        for st in self.streams:
+            st.write(text)
+
+    def flush(self):
+        for st in self.streams:
+            st.flush()
+
+
+def image_for(row: dict) -> tuple[bytes | None, str]:
+    """The row's image from data/images (made once by make_benchmark_images.py), checked against its fingerprint."""
+    if row.get("kind") != "image":
+        return None, ""
+    import hashlib
+    manifest_path = ROOT / "data" / "images" / "manifest.json"
+    entry = json.loads(manifest_path.read_text(encoding="utf-8")).get(row["id"]) if manifest_path.is_file() else None
+    if not entry:
+        return None, ""  # no image: Valerius can't read it, so it holds (counted as such)
+    data = (ROOT / "data" / "images" / entry["file"]).read_bytes()
+    if hashlib.sha256(data).hexdigest() != entry["sha256"]:
+        raise SystemExit(f"{row['id']}: image does not match its fingerprint in data/images/manifest.json")
+    return data, ""
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--final", action="store_true", help="score the locked test rows")
     ap.add_argument("--live", action="store_true", help="call Muse Spark and the second pass")
+    ap.add_argument("--out", help="also save everything printed to this file (UTF-8)")
     args = ap.parse_args()
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        sys.stdout = _Tee(sys.stdout, open(args.out, "w", encoding="utf-8"))
     split = "test" if args.final else "dev"
     rows = [json.loads(x) for x in (ROOT / "data" / "benchmark.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
     rows = [r for r in rows if r["split"] == split]
@@ -59,7 +91,8 @@ def main() -> None:
     disagreements = errors = 0
     misses, false_alarms = [], []
     for r in rows:
-        res = pipeline.run(to_message(r), use_models=args.live)
+        media, mime = image_for(r)
+        res = pipeline.run(to_message(r), use_models=args.live, media=media, media_mime=mime)
         flagged = res.hold
         if args.live:
             cost += res.standard_cost_usd()
