@@ -234,6 +234,17 @@ class OwnerDashboard(unittest.TestCase):
         self.assertFalse(act.dashboard_ok(act.dashboard_token(now=0)))     # expired
         self.assertFalse(act.dashboard_ok(dict(t, s="0" * 64)))
 
+    def test_leaked_link_can_be_cancelled(self):
+        import time
+        old = act.dashboard_token(now=int(time.time()) - 600)
+        self.assertTrue(act.dashboard_ok(old))
+        object.__setattr__(act.SETTINGS, "dashboard_not_before", int(time.time()) - 60)
+        try:
+            self.assertFalse(act.dashboard_ok(old))
+            self.assertTrue(act.dashboard_ok(act.dashboard_token()))
+        finally:
+            object.__setattr__(act.SETTINGS, "dashboard_not_before", 0)
+
     def test_page_lists_waiting_cases_escaped(self):
         from valerius import page
         cases = [{"id": "aaaaaaaaaaaa", "status": "held", "risk": "HIGH", "channel": "business", "created_at": 0,

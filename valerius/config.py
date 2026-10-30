@@ -75,6 +75,8 @@ class Settings:
     whatsapp_app_secret: str = field(default_factory=lambda: _env("WHATSAPP_APP_SECRET"))
     trusted_contact: str = field(default_factory=lambda: _env("TRUSTED_CONTACT"))  # opted-in family number
     intake_code: str = field(default_factory=lambda: _env("INTAKE_CODE"))  # access code for the web intake page
+    # Dashboard links made before this Unix time stop working (to cancel a link that leaked)
+    dashboard_not_before: int = field(default_factory=lambda: int(_env("DASHBOARD_NOT_BEFORE", "0") or 0))
     server_live: bool = field(default_factory=lambda: _env("SERVER_LIVE", "1") == "1")  # call models from the server
 
     signing_secret: str = field(default_factory=lambda: _env("SIGNING_SECRET"))

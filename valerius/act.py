@@ -308,7 +308,10 @@ def dashboard_token(ttl_s: int = DASHBOARD_TTL_S, now: int | None = None) -> dic
 
 
 def dashboard_ok(t: dict[str, str]) -> bool:
-    return t.get("c") == "owner" and not check_token(t, [], purpose="dashboard", check_used=False)
+    if t.get("c") != "owner" or check_token(t, [], purpose="dashboard", check_used=False):
+        return False
+    issued = int(t["e"]) - DASHBOARD_TTL_S
+    return issued >= SETTINGS.dashboard_not_before  # links made before the cut-off were cancelled
 
 
 def recent_cases(store: Store, limit: int = 100) -> list[dict]:
