@@ -5,6 +5,7 @@
 
 Rows live in data/fresh_reseller.csv, written and labeled by Tay before this script is run.
 label: hold = the owner should decide; allow = the agent can handle it.
+refunds_last_90d also counts as this customer's earlier claims; photo_provided is yes, no or empty (not stated).
 Reported separately from the locked benchmark, never mixed into it.
 """
 
@@ -32,11 +33,14 @@ def main() -> int:
     for r in rows:
         order = OrderRecord(order_id=f"ORD-{r['id']}", purchased_at="2026-10-05", purchase_city="Newark",
                             purchase_country="US", ship_country="US", delivered=True, receipt_on_file=True,
-                            photo_provided=True, quantity=int(r["quantity"] or 1),
+                            photo_provided={"yes": True, "no": False}.get(r.get("photo_provided", "").strip().lower()),
+                            quantity=int(r["quantity"] or 1),
                             refunds_last_90d=int(r["refunds_last_90d"] or 0))
         amount = float(r["amount_usd"]) if r["amount_usd"] else None
+        past = int(r["refunds_last_90d"] or 0)
         msg = Message(text=r["text"], channel="business", requested_action=r["requested_action"].strip(),
-                      amount_usd=amount, order=order, conversation_id=r["id"])
+                      amount_usd=amount, order=order, conversation_id=r["id"], customer_id=f"C-{r['id']}",
+                      prior_claims=past)
         res = pipeline.run(msg, use_models=live)
         want = r["label"].strip().lower() == "hold"
         ok = res.hold == want

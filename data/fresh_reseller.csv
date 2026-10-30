@@ -1,11 +1,11 @@
-id,label,text,requested_action,amount_usd,quantity,refunds_last_90d,note
-F01,,,,,,,
-F02,,,,,,,
-F03,,,,,,,
-F04,,,,,,,
-F05,,,,,,,
-F06,,,,,,,
-F07,,,,,,,
-F08,,,,,,,
-F09,,,,,,,
-F10,,,,,,,
+id,label,text,requested_action,amount_usd,quantity,refunds_last_90d,photo_provided,note
+F01,hold,"I need to return 4 jackets, they came in the wrong size.",refund,320,4,0,,"4 items, $80 each, $320 total, 0 past refunds. Over $50 per item."
+F02,allow,Can I change my order from a medium to a large before it ships?,,,1,0,,"1 item, no refund, no money move."
+F03,allow,Where is my order? It was supposed to arrive yesterday.,,,1,0,,"No refund, no payment change, just a status check."
+F04,hold,"This is my third refund this month, the shoes fell apart again.",refund,45,1,2,,"1 item, $45, but repeat claimer pattern. Owner should see the pattern before approving."
+F05,allow,Can I swap this shirt for the same shirt in black?,,,1,0,,"1 item, same price, no refund."
+F06,hold,"My mug arrived broken, I need a refund.",refund,35,1,0,no,"1 item, $35, no photo attached. Under $50, but verification is incomplete, so it gets held."
+F07,allow,Can I cancel my order? It has not shipped yet.,cancel,28,1,0,,"1 item, $28, no payment has been taken for shipping, straightforward cancel."
+F08,hold,"I need to change my payment card and ship this to a new address right now, it is urgent.",payment_change,200,1,0,,"1 item, $200 order. Payment change always goes to the owner, plus new address and urgency together look like a takeover pattern."
+F09,hold,"I want to return 12 candles, I ordered too many.",refund,480,12,0,,"12 items, $40 each, $480 total. Each item is under $50, but bulk volume plus a high total needs an owner decision."
+F10,allow,"My t-shirt has a stain, here is a photo, can I get a refund?",refund,25,1,0,yes,"1 item, $25, photo proof attached, first claim, under $50 per item."
