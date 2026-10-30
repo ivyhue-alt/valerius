@@ -1,0 +1,78 @@
+  P002 pos -> HIGH HOLD
+  P005 pos -> HIGH HOLD
+  P007 pos -> HIGH HOLD
+  P009 pos -> HIGH HOLD
+  P010 pos -> HIGH HOLD
+  P012 pos -> CRITICAL HOLD
+  P013 pos -> CRITICAL HOLD
+  P016 pos -> CRITICAL HOLD
+  P018 pos -> HIGH HOLD
+  P019 pos -> CRITICAL HOLD
+  P020 pos -> HIGH HOLD
+  P022 pos -> HIGH HOLD
+  P024 pos -> CRITICAL HOLD
+  P030 pos -> HIGH HOLD
+  P031 pos -> HIGH HOLD
+  P032 pos -> CRITICAL HOLD
+  P034 pos -> CRITICAL HOLD
+  P037 pos -> HIGH HOLD
+  P043 neg -> LOW
+  P044 neg -> LOW
+  P047 neg -> LOW
+  P048 neg -> LOW
+  P050 neg -> LOW
+  P052 neg -> LOW
+  P056 neg -> LOW
+  P057 neg -> LOW
+  P058 neg -> LOW
+  P060 neg -> LOW
+  P061 neg -> LOW
+  P062 neg -> LOW
+  P064 neg -> LOW
+  P065 neg -> LOW
+  P066 neg -> LOW
+  P067 neg -> LOW
+  P070 neg -> LOW
+  P073 pos -> HIGH HOLD
+  P076 pos -> HIGH HOLD
+  P077 pos -> CRITICAL HOLD
+  P081 pos -> HIGH HOLD
+  P083 pos -> HIGH HOLD
+  P084 pos -> HIGH HOLD (disagree)
+  P085 pos -> HIGH HOLD
+  P086 pos -> HIGH HOLD (disagree)
+  P087 pos -> HIGH HOLD
+  P089 pos -> HIGH HOLD (disagree)
+  P090 pos -> HIGH HOLD (disagree)
+  P091 pos -> HIGH HOLD (disagree)
+  P092 pos -> HIGH HOLD
+  P093 pos -> MEDIUM
+  P095 pos -> HIGH HOLD
+  P096 pos -> HIGH HOLD
+  P100 pos -> HIGH HOLD (disagree)
+  P103 neg -> LOW
+  P108 neg -> LOW
+  P109 neg -> LOW
+  P113 neg -> LOW
+  P117 neg -> LOW
+  P119 neg -> LOW
+  P120 neg -> LOW
+  P122 neg -> LOW
+  P123 neg -> LOW
+  P124 neg -> LOW
+  P126 neg -> LOW
+  P128 neg -> LOW
+  P129 neg -> LOW
+  P130 neg -> LOW
+  P135 neg -> LOW
+  P138 neg -> LOW
+  P139 neg -> LOW
+  P141 neg -> LOW
+[test] stage: rules + Muse Spark + second pass | n=70 (synthetic, hand-labeled)
+  catch rate   34/35 = 97%  (95% CI 85% to 99%)
+  false alarms 0/35 = 0%  (95% CI 0% to 10%)
+  missed:      P093 reseller_pattern
+  false alarm: none
+  Muse Spark cost at Standard prices: $0.4349 total, $0.00621 per message
+  model call time: median 3.6s, slowest 13.6s
+  disagreements sent to a human: 6 | model errors: 0
