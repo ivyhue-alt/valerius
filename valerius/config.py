@@ -42,13 +42,13 @@ class PolicyCard:
     max_claims: int = 2                      # refund/reship claims per customer before the owner decides
     claim_window_days: int = 90
     always_ask: tuple[str, ...] = ("cancel", "payment_change", "account_change")
-    free_cancel_minutes: int = 60            # a cancel within this long after purchase, not yet shipped: agent may do it, any hour
+    free_cancel_minutes: int = 30            # payment usually settles within this; after it, a cancel costs the business fees
 
     def lines(self) -> list[str]:
         return [
             f"Refunds and reships up to ${self.refund_limit_usd:,.0f} per item and ${self.order_limit_usd:,.0f} per request: agent may approve alone.",
             f"A customer's claim number {self.max_claims + 1} or more within {self.claim_window_days} days: owner decides.",
-            f"Cancel within {self.free_cancel_minutes} minutes of purchase, not yet shipped: agent may do it, any time of day.",
+            f"Cancel before the payment is taken (or within {self.free_cancel_minutes} minutes if that's unknown) and before shipping: agent may do it, any time of day.",
             "Damage claims without a photo, later cancellations, payment changes and account changes: owner approves.",
         ]
 

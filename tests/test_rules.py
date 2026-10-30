@@ -168,18 +168,26 @@ class ResellerRefund(unittest.TestCase):
 
 
 class QuickCancel(unittest.TestCase):
-    """Tay's owner rule (Oct 30): a cancel within 60 minutes of purchase, not shipped, needs no owner, any hour."""
+    """Tay's owner rule (Oct 30): the agent may cancel, any hour, while nothing is shipped and the payment isn't
+    taken yet (or, if that's unknown, within 30 minutes of purchase). Otherwise the owner decides."""
 
-    def _cancel(self, minutes, shipped=None):
-        order = OrderRecord(order_id="ORD-C", purchased_at="2026-10-30", minutes_since_purchase=minutes, shipped=shipped)
+    def _cancel(self, minutes, shipped=None, captured=None):
+        order = OrderRecord(order_id="ORD-C", purchased_at="2026-10-30", minutes_since_purchase=minutes, shipped=shipped,
+                            payment_captured=captured)
         return rules.check(Message(text="Can I cancel my order?", channel=Channel.BUSINESS,
                                    requested_action="cancel", amount_usd=28, order=order))
 
-    def test_within_the_hour_is_allowed(self):
+    def test_within_30_minutes_is_allowed(self):
         self.assertLess(self._cancel(20).floor, Risk.HIGH)
 
-    def test_after_the_hour_goes_to_owner(self):
-        self.assertGreaterEqual(self._cancel(180).floor, Risk.HIGH)
+    def test_after_30_minutes_goes_to_owner(self):
+        self.assertGreaterEqual(self._cancel(45).floor, Risk.HIGH)
+
+    def test_payment_taken_goes_to_owner(self):
+        self.assertGreaterEqual(self._cancel(10, captured=True).floor, Risk.HIGH)
+
+    def test_preauthorized_only_is_allowed_even_later(self):
+        self.assertLess(self._cancel(300, captured=False).floor, Risk.HIGH)
 
     def test_already_shipped_goes_to_owner(self):
         self.assertGreaterEqual(self._cancel(10, shipped=True).floor, Risk.HIGH)

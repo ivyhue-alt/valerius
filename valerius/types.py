@@ -37,6 +37,7 @@ class OrderRecord:
     gift_card_redeemed_at: str = ""  # ISO date
     minutes_since_purchase: int | None = None  # from the store's system when the request came in
     shipped: bool | None = None
+    payment_captured: bool | None = None       # False = only pre-authorized (a cancel just voids the hold)
 
 
 @dataclass

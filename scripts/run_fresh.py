@@ -5,7 +5,7 @@
 
 Rows live in data/fresh_reseller.csv, written and labeled by Tay before this script is run.
 label: hold = the owner should decide; allow = the agent can handle it.
-refunds_last_90d also counts as this customer's earlier claims; photo_provided and shipped are yes, no or empty (not stated).
+refunds_last_90d also counts as this customer's earlier claims; photo_provided, shipped and payment_captured are yes, no or empty (not stated).
 Reported separately from the locked benchmark, never mixed into it.
 """
 
@@ -37,6 +37,7 @@ def main() -> int:
                             quantity=int(r["quantity"] or 1),
                             minutes_since_purchase=int(r["minutes_since_purchase"]) if r.get("minutes_since_purchase") else None,
                             shipped={"yes": True, "no": False}.get(r.get("shipped", "").strip().lower()),
+                            payment_captured={"yes": True, "no": False}.get(r.get("payment_captured", "").strip().lower()),
                             refunds_last_90d=int(r["refunds_last_90d"] or 0))
         amount = float(r["amount_usd"]) if r["amount_usd"] else None
         past = int(r["refunds_last_90d"] or 0)
