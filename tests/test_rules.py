@@ -136,3 +136,32 @@ class ShiftLead(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ResellerRefund(unittest.TestCase):
+    """Added after the final run: a refund on a bulk order goes to the owner (was MEDIUM, not held)."""
+
+    def _msg(self, action, qty, refunds=0):
+        from valerius.types import Message, OrderRecord
+        order = OrderRecord(order_id="ORD-X", purchased_at="2026-10-01", delivered=True, receipt_on_file=True,
+                            quantity=qty, refunds_last_90d=refunds)
+        return Message(text="I'd like to send these back.", channel="business", requested_action=action,
+                       amount_usd=20, order=order)
+
+    def test_bulk_refund_is_held(self):
+        from valerius import rules
+        from valerius.types import Risk
+        a = rules.check(self._msg("refund", 8))
+        self.assertIn("reseller_pattern", [f.rule for f in a.findings])
+        self.assertGreaterEqual(a.floor, Risk.HIGH)
+
+    def test_repeat_refunder_is_held(self):
+        from valerius import rules
+        from valerius.types import Risk
+        self.assertGreaterEqual(rules.check(self._msg("refund", 1, refunds=4)).floor, Risk.HIGH)
+
+    def test_bulk_order_without_a_claim_stays_medium(self):
+        from valerius import rules
+        from valerius.types import Risk
+        a = rules.check(self._msg("", 8))
+        self.assertEqual([f.risk for f in a.findings if f.rule == "reseller_pattern"], [Risk.MEDIUM])

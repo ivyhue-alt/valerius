@@ -280,7 +280,12 @@ def _business_rules(msg: Message, policy: PolicyCard) -> tuple[list[Finding], li
             ev.append(_rec("quantity", o.quantity))
         if o.refunds_last_90d >= 3:
             ev.append(_rec("refunds_last_90d", o.refunds_last_90d))
-        out.append(Finding("reseller_pattern", Risk.MEDIUM, "bulk buying or repeated refunds, a reseller pattern", ev))
+        if is_claim:
+            # Asking for money back (or a reship) on a bulk order is the owner's call, not the agent's.
+            out.append(Finding("reseller_pattern", Risk.HIGH,
+                               "a refund or reship on a bulk order or after repeated refunds, a reseller pattern; the owner decides", ev))
+        else:
+            out.append(Finding("reseller_pattern", Risk.MEDIUM, "bulk buying or repeated refunds, a reseller pattern", ev))
 
     story = _search(PRESSURE_STORY, t)
     ask = _search(EXCEPTION_ASK, t)
