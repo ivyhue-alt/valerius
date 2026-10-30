@@ -35,6 +35,8 @@ class OrderRecord:
     gift_card_loaded: bool | None = None
     gift_card_redeemed_city: str = ""
     gift_card_redeemed_at: str = ""  # ISO date
+    minutes_since_purchase: int | None = None  # from the store's system when the request came in
+    shipped: bool | None = None
 
 
 @dataclass

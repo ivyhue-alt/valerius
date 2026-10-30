@@ -193,7 +193,11 @@ def _business_rules(msg: Message, policy: PolicyCard) -> tuple[list[Finding], li
         out.append(Finding("unknown_action", Risk.CRITICAL,
                            "the agent asked for an action that is not on the owner's list, so it is blocked",
                            [_rec("requested_action", action)]))
+    quick_cancel = (o is not None and o.minutes_since_purchase is not None and o.shipped is not True
+                    and 0 <= o.minutes_since_purchase <= policy.free_cancel_minutes)
     for act in policy.always_ask:
+        if act == "cancel" and quick_cancel:
+            continue  # the owner lets the agent cancel within the first hour, before shipping (time unknown: owner decides)
         if action == act or act in implied:
             ev = [_rec("requested_action", action)] if action == act else [implied[act]]
             out.append(Finding("owner_approval_required", Risk.HIGH,

@@ -165,3 +165,24 @@ class ResellerRefund(unittest.TestCase):
         from valerius.types import Risk
         a = rules.check(self._msg("", 8))
         self.assertEqual([f.risk for f in a.findings if f.rule == "reseller_pattern"], [Risk.MEDIUM])
+
+
+class QuickCancel(unittest.TestCase):
+    """Tay's owner rule (Oct 30): a cancel within 60 minutes of purchase, not shipped, needs no owner, any hour."""
+
+    def _cancel(self, minutes, shipped=None):
+        order = OrderRecord(order_id="ORD-C", purchased_at="2026-10-30", minutes_since_purchase=minutes, shipped=shipped)
+        return rules.check(Message(text="Can I cancel my order?", channel=Channel.BUSINESS,
+                                   requested_action="cancel", amount_usd=28, order=order))
+
+    def test_within_the_hour_is_allowed(self):
+        self.assertLess(self._cancel(20).floor, Risk.HIGH)
+
+    def test_after_the_hour_goes_to_owner(self):
+        self.assertGreaterEqual(self._cancel(180).floor, Risk.HIGH)
+
+    def test_already_shipped_goes_to_owner(self):
+        self.assertGreaterEqual(self._cancel(10, shipped=True).floor, Risk.HIGH)
+
+    def test_time_unknown_goes_to_owner(self):
+        self.assertGreaterEqual(self._cancel(None).floor, Risk.HIGH)
