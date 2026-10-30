@@ -167,3 +167,65 @@ def intake_result(risk: str, held: bool, reply: str, link: str = "") -> str:
     body = (f"<h1>Valerius says {pill}</h1><div class=card><p>{escape(reply)}</p></div>{review}"
             "<p><a href='/check'>Check another message</a></p>")
     return _shell("Valerius check", body)
+
+
+def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dict[str, str],
+                    agent_token: dict[str, str] | None, agent_paused: bool) -> str:
+    """The owner's phone view: what's waiting, what was decided, and the pause switch."""
+    import time as _time
+    from .textnorm import scrub_model_text
+
+    def when(ts) -> str:
+        try:
+            mins = max(0, int((_time.time() - int(ts)) // 60))
+        except (TypeError, ValueError):
+            return ""
+        return f"{mins} min ago" if mins < 60 else f"{mins // 60} h ago" if mins < 1440 else f"{mins // 1440} d ago"
+
+    def row(c: dict, action: str = "") -> str:
+        risk = escape(str(c.get("risk", "")))
+        held = c.get("status") == "held"
+        reason = (c.get("findings") or [{}])[0].get("reason", "") or ("could not verify everything" if c.get("unverified") else "")
+        what = ""
+        if c.get("requested_action"):
+            amt = f" ${float(c['amount_usd']):,.2f}" if c.get("amount_usd") is not None else ""
+            what = f"<b>{escape(c['requested_action'].replace('_', ' '))}{escape(amt)}</b> &middot; "
+        snippet = scrub_model_text(str(c.get("text", "")))[:90]
+        return (f"<li style='list-style:none;margin:0 0 10px;padding:0'><div class=card>"
+                f"<span class='pill{'' if held else ' ok'}'>{risk}</span> "
+                f"<span class='small muted'>{escape(str(c.get('status', '')))} &middot; {escape(when(c.get('created_at')))} &middot; "
+                f"{escape(str(c.get('channel', '')))}</span>"
+                f"<p style='margin:8px 0 4px'>{what}{escape(snippet)}</p>"
+                f"<p class='small muted' style='margin:0'>{escape(reason)}</p>{action}</div></li>")
+
+    waiting = [c for c in cases if c.get("status") == "held"]
+    done = [c for c in cases if c.get("status") != "held"][:15]
+    waiting_html = "".join(
+        row(c, f"<p style='margin:10px 0 0'><a href='{escape(review_links[c['id']])}'>Review and decide</a></p>"
+            if c.get("id") in review_links else "") for c in waiting) or "<p class=muted>Nothing is waiting. </p>"
+    done_html = "".join(row(c) for c in done) or "<p class=muted>Nothing yet.</p>"
+
+    stats = (f"<div class=row style='margin-top:8px'>"
+             + "".join(f"<div class=card style='flex:1;text-align:center'><div style='font-size:1.5rem;font-weight:700'>{n}</div>"
+                       f"<div class='small muted'>{label}</div></div>"
+                       for n, label in ((len(waiting), "waiting"), (record.get("approved", 0), "approved"),
+                                        (record.get("blocked", 0), "blocked")))
+             + "</div>")
+    switch = ""
+    if agent_token:
+        hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(agent_token.get(k, '')))}'>" for k in TOKEN_KEYS)
+        verb, path = ("Resume agent", "resume") if agent_paused else ("Pause agent", "pause")
+        note = "Paused: every action the agent asks for is held." if agent_paused else "Running under your rules."
+        switch = (f"<h2>Agent</h2><div class=card><p class=small>{escape(note)}</p>"
+                  f"<form method=post action='/agent/{path}'>{hidden}<button class=block>{verb}</button></form></div>")
+    rules = "".join(f"<li>{escape(x)}</li>" for x in SETTINGS.policy.lines())
+    body = (f"<h1>{escape(SETTINGS.policy.business_name)} &middot; Valerius</h1>"
+            "<p class='small muted'>Refreshes every 30 seconds. Save this page to your home screen.</p>"
+            f"{stats}<h2>Waiting for you</h2><ul style='padding:0'>{waiting_html}</ul>"
+            f"<h2>Recently handled</h2><ul style='padding:0'>{done_html}</ul>{switch}"
+            f"<h2>Your rules</h2><div class=card><ul>{rules}</ul></div>"
+            "<p class='small muted'>View only. Approve and Block happen on each case's own page, with a link that works once.</p>")
+    html = _shell("Valerius owner", body)
+    return html.replace("<meta name=robots content=noindex>",
+                        "<meta name=robots content=noindex><meta http-equiv=refresh content=30>"
+                        "<meta name=apple-mobile-web-app-capable content=yes>", 1)

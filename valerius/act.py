@@ -299,6 +299,29 @@ def owner_alert(case: dict) -> str:
     return f"Valerius held a {case['risk']} request for your review: {case.get('link', '')} (link expires in 2 hours)"
 
 
+DASHBOARD_TTL_S = 7 * 86400
+
+
+def dashboard_token(ttl_s: int = DASHBOARD_TTL_S, now: int | None = None) -> dict[str, str]:
+    """The owner's dashboard link: view-only, reusable, expires in 7 days. Approve/Block still need a per-case link."""
+    return sign("owner", "dashboard", ttl_s, now)
+
+
+def dashboard_ok(t: dict[str, str]) -> bool:
+    return t.get("c") == "owner" and not check_token(t, [], purpose="dashboard", check_used=False)
+
+
+def recent_cases(store: Store, limit: int = 100) -> list[dict]:
+    paths = sorted((store.root / "cases").glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]
+    out = []
+    for p in paths:
+        case = store.load_case(p.stem)
+        if case is not None:
+            out.append(case)
+    out.sort(key=lambda c: c.get("created_at", 0), reverse=True)
+    return out
+
+
 def agent_token() -> dict[str, str]:
     return sign("agent", "agent")
 

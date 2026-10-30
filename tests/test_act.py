@@ -185,6 +185,14 @@ class Server(Base):
     def test_health(self):
         self.assertEqual(self.get("/health"), (200, "ok"))
 
+    def test_owner_dashboard_needs_its_link(self):
+        server.handle_incoming(whatsapp.fake_webhook(SCAM), self.store, use_models=False)
+        status, html = self.get("/owner?" + urllib.parse.urlencode(act.dashboard_token()))
+        self.assertEqual(status, 200)
+        self.assertIn("Review and decide", html)
+        self.assertEqual(self.get("/owner")[0], 403)
+        self.assertEqual(self.get("/owner?" + urllib.parse.urlencode(act.sign("owner", "decide")))[0], 403)
+
     def test_webhook_end_to_end_then_owner_decides(self):
         payload = whatsapp.fake_webhook(SCAM)
         done = server.handle_incoming(payload, self.store, use_models=False)
@@ -214,3 +222,27 @@ class Server(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OwnerDashboard(unittest.TestCase):
+    def test_dashboard_token_rules(self):
+        t = act.dashboard_token()
+        self.assertTrue(act.dashboard_ok(t))
+        self.assertTrue(act.dashboard_ok(t))          # reusable (view only)
+        self.assertFalse(act.dashboard_ok(dict(t, c="abc")))
+        self.assertFalse(act.dashboard_ok(act.sign("owner", "decide")))   # a decide link can't open the dashboard
+        self.assertFalse(act.dashboard_ok(act.dashboard_token(now=0)))     # expired
+        self.assertFalse(act.dashboard_ok(dict(t, s="0" * 64)))
+
+    def test_page_lists_waiting_cases_escaped(self):
+        from valerius import page
+        cases = [{"id": "aaaaaaaaaaaa", "status": "held", "risk": "HIGH", "channel": "business", "created_at": 0,
+                  "text": "<script>x</script> refund $900", "requested_action": "refund", "amount_usd": 900,
+                  "findings": [{"reason": "over the limit"}]},
+                 {"id": "bbbbbbbbbbbb", "status": "blocked", "risk": "HIGH", "channel": "family", "text": "hi"}]
+        html = page.owner_dashboard(cases, {"approved": 1, "blocked": 1}, {"aaaaaaaaaaaa": "http://x/case/aaaaaaaaaaaa?c=1"},
+                                    None, False)
+        self.assertIn("Review and decide", html)
+        self.assertIn("over the limit", html)
+        self.assertNotIn("<script>x", html)
+        self.assertIn("http-equiv=refresh", html)

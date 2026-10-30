@@ -172,6 +172,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, "ok", "text/plain")
         if u.path == "/check" and SETTINGS.intake_code:
             return self._send(200, page.intake_form())
+        if u.path == "/owner":
+            if not act.dashboard_ok(q):
+                return self._send(403, page.result_page("Link not valid", "This dashboard link is not valid or has expired."))
+            cases = act.recent_cases(STORE)
+            links = {c["id"]: act.link(act.sign(c["id"], "decide")) for c in cases if c.get("status") == "held"}
+            agent = STORE.agent()
+            return self._send(200, page.owner_dashboard(cases, act.track_record(STORE), links,
+                                                        act.agent_token(), bool(agent.get("paused"))))
         if u.path == "/webhook":
             if q.get("hub.mode") == "subscribe" and SETTINGS.whatsapp_verify_token and \
                     hmac.compare_digest(q.get("hub.verify_token", ""), SETTINGS.whatsapp_verify_token):
