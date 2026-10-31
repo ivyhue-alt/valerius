@@ -171,6 +171,33 @@ def count_claims(store: Store, customer_id: str, window_days: int, now: int | No
     return n
 
 
+def customer_history(store: Store, customer_id: str, days: int | None = None, now: int | None = None,
+                     exclude: str = "") -> list[dict]:
+    """This customer's earlier requests (up to 2 years by default), oldest first, for the owner's timeline."""
+    if not customer_id:
+        return []
+    now = now if now is not None else int(time.time())
+    since = now - (days if days is not None else SETTINGS.policy.history_days) * 86400
+    out = []
+    for p in (store.root / "cases").glob("*.json"):
+        try:
+            c = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if c.get("customer_id") == customer_id and c.get("id") != exclude and since <= int(c.get("created_at", 0)) <= now:
+            out.append({"at": int(c.get("created_at", 0)), "action": c.get("requested_action", ""),
+                        "amount_usd": c.get("amount_usd"), "status": c.get("status", ""), "is_claim": bool(c.get("is_claim"))})
+    return sorted(out, key=lambda x: x["at"])
+
+
+def last_receipt(store: Store, case_id: str) -> dict | None:
+    found = None
+    for r in store.receipts():
+        if r.get("case_id") == case_id:
+            found = r
+    return found
+
+
 def with_history(msg, store: Store, now: int | None = None):
     """Attach the customer's recent claim count before the rules run (business side only)."""
     from dataclasses import replace as _replace

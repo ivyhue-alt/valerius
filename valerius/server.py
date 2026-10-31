@@ -117,6 +117,10 @@ def _handle_one(msg, store: act.Store, live: bool) -> dict:
     return {"case": case["id"], "status": case["status"], "risk": case["risk"], "sent": sent}
 
 
+def act_keys() -> tuple[str, ...]:
+    return page.TOKEN_KEYS
+
+
 def handle_check(text: str, data: bytes, store: act.Store = STORE, live: bool | None = None) -> tuple[int, str]:
     """Run one web-forwarded message through the loop. Returns (status, html)."""
     live = SETTINGS.server_live if live is None else live
@@ -145,7 +149,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy",
-                         "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+                         "default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
         self.end_headers()
@@ -178,8 +182,13 @@ class Handler(BaseHTTPRequestHandler):
             cases = act.recent_cases(STORE)
             links = {c["id"]: act.link(act.sign(c["id"], "decide")) for c in cases if c.get("status") == "held"}
             agent = STORE.agent()
-            return self._send(200, page.owner_dashboard(cases, act.track_record(STORE), links,
-                                                        act.agent_token(), bool(agent.get("paused"))))
+            from urllib.parse import urlencode
+            counts = {c["customer_id"]: sum(1 for h in act.customer_history(STORE, c["customer_id"], exclude=c["id"])
+                                            if h["is_claim"])
+                      for c in cases if c.get("status") == "held" and c.get("customer_id")}
+            tab_q = urlencode({k: q.get(k, "") for k in act_keys()})
+            return self._send(200, page.owner_dashboard(cases, act.track_record(STORE), links, act.agent_token(),
+                                                        bool(agent.get("paused")), q.get("view", "waiting"), tab_q, counts))
         if u.path == "/webhook":
             if q.get("hub.mode") == "subscribe" and SETTINGS.whatsapp_verify_token and \
                     hmac.compare_digest(q.get("hub.verify_token", ""), SETTINGS.whatsapp_verify_token):
@@ -201,8 +210,9 @@ class Handler(BaseHTTPRequestHandler):
             if why:
                 return self._send(403, page.result_page("Link not valid", why))
             agent = STORE.agent()
+            history = act.customer_history(STORE, case.get("customer_id", ""), exclude=case.get("id", ""))
             return self._send(200, page.approval_page(case, q, act.track_record(STORE),
-                                                      act.agent_token(), bool(agent.get("paused"))))
+                                                      act.agent_token(), bool(agent.get("paused")), history))
         return self._send(404, "not found", "text/plain")
 
     def _check(self) -> None:
@@ -245,9 +255,10 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/case/([a-f0-9]{12})/decide", u.path)
         if m:
             ok, info = act.decide(m.group(1), form, form.get("decision", ""), STORE)
-            title = {"approved": "Approved", "blocked": "Blocked"}.get(info, "Could not record that")
-            detail = "Done. A signed receipt was recorded." if ok else info
-            return self._send(200 if ok else 403, page.result_page(title, detail))
+            if ok:
+                case = STORE.load_case(m.group(1))
+                return self._send(200, page.receipt_page(case, act.last_receipt(STORE, m.group(1))))
+            return self._send(403, page.result_page("Could not record that", info))
         m = re.fullmatch(r"/agent/(pause|resume)", u.path)
         if m:
             ok, info = act.switch_agent(m.group(1) == "pause", form, STORE)

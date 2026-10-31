@@ -42,6 +42,9 @@ class PolicyCard:
     max_claims: int = 2                      # refund/reship claims per customer before the owner decides
     claim_window_days: int = 90
     always_ask: tuple[str, ...] = ("cancel", "payment_change", "account_change")
+    processor_fee_pct: float = 2.9           # the owner's card processor fee, kept by the processor on a refund (estimate)
+    processor_fee_usd: float = 0.30
+    history_days: int = 730                  # how far back Valerius shows a customer's claims (limits use claim_window_days)
     free_cancel_minutes: int = 30            # payment usually settles within this; after it, a cancel costs the business fees
 
     def lines(self) -> list[str]:

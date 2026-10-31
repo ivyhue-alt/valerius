@@ -278,6 +278,39 @@ def transcribe(data: bytes, filename: str = "voice.wav", mime: str = "audio/ogg"
     return extract_transcript(res), ""
 
 
+def image_size(data: bytes) -> tuple[int, int]:
+    """(width, height) of a PNG, JPEG or WEBP from its header, or (0, 0)."""
+    import struct
+    try:
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            return struct.unpack(">II", data[16:24])
+        if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            chunk = data[12:16]
+            if chunk == b"VP8X":
+                return 1 + int.from_bytes(data[24:27], "little"), 1 + int.from_bytes(data[27:30], "little")
+            if chunk == b"VP8 ":
+                w, h = struct.unpack("<HH", data[26:30])
+                return w & 0x3FFF, h & 0x3FFF
+            if chunk == b"VP8L":
+                b = int.from_bytes(data[21:25], "little")
+                return 1 + (b & 0x3FFF), 1 + ((b >> 14) & 0x3FFF)
+        if data[:3] == b"\xff\xd8\xff":
+            i = 2
+            while i + 9 < len(data):
+                if data[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = data[i + 1]
+                size = struct.unpack(">H", data[i + 2:i + 4])[0]
+                if marker in (0xC0, 0xC1, 0xC2):
+                    h, w = struct.unpack(">HH", data[i + 5:i + 9])
+                    return w, h
+                i += 2 + size
+    except (struct.error, IndexError):
+        pass
+    return 0, 0
+
+
 def extract_transcript(res) -> str:
     """Pull the text out of a transcription reply, whatever the exact shape."""
     if isinstance(res, str):

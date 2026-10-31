@@ -189,7 +189,7 @@ class Server(Base):
         server.handle_incoming(whatsapp.fake_webhook(SCAM), self.store, use_models=False)
         status, html = self.get("/owner?" + urllib.parse.urlencode(act.dashboard_token()))
         self.assertEqual(status, 200)
-        self.assertIn(">Review<", html)
+        self.assertTrue(">Review<" in html or ">Decide now<" in html)
         self.assertEqual(self.get("/owner")[0], 403)
         self.assertEqual(self.get("/owner?" + urllib.parse.urlencode(act.sign("owner", "decide")))[0], 403)
 
@@ -257,3 +257,42 @@ class OwnerDashboard(unittest.TestCase):
         self.assertIn("Over the limit", html)
         self.assertNotIn("<script>x", html)
         self.assertIn("http-equiv=refresh", html)
+
+
+class OwnerScreens(unittest.TestCase):
+    def test_hold_screen_shows_consequences_history_and_evidence(self):
+        import base64
+        import time
+        png = (b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (400).to_bytes(4, "big") + (300).to_bytes(4, "big") + b"\x08\x02\x00\x00\x00")
+        case = {"id": "abcabcabcabc", "status": "held", "risk": "HIGH", "channel": "business", "created_at": int(time.time()),
+                "customer_id": "C-7", "text": "refund please", "requested_action": "refund", "amount_usd": 480,
+                "order": {"order_id": "ORD-9", "quantity": 12}, "findings": [], "unverified": [],
+                "models": {"muse-spark": "HIGH", "muse-spark-open": "LOW"}, "disagreement": True,
+                "model_reasons": {"muse-spark": {"reasons": ["x"], "quotes": []}},
+                "media": {"preview": {"mime": "image/png", "b64": base64.b64encode(png).decode(), "w": 400, "h": 300},
+                          "regions": {"bank account details": [[10, 20, 110, 80]], "QR code": []}}}
+        history = [{"at": 1700000000, "action": "refund", "amount_usd": 40, "status": "approved", "is_claim": True}]
+        html = page.approval_page(case, act.sign(case["id"], "decide"), {"held": 1, "approved": 0, "blocked": 0},
+                                  history=history)
+        self.assertIn("If you approve", html)
+        self.assertIn("$480.00 goes back", html)
+        self.assertIn("about $14.22", html)            # 2.9% + $0.30 estimate
+        self.assertIn("1 in the last 2 years", html)
+        self.assertIn("The two reviews disagree", html)
+        self.assertIn("data:image/png;base64,", html)
+        self.assertIn("Bank details", html)
+        self.assertIn("works once, for", html)
+
+    def test_receipt_page_after_decision(self):
+        case = {"status": "blocked", "requested_action": "refund", "amount_usd": 45, "channel": "business",
+                "order": {"order_id": "ORD-1"}}
+        html = page.receipt_page(case, {"seq": 12, "hash": "ab" * 32})
+        self.assertIn("Blocked", html)
+        self.assertIn("No money moves", html)
+        self.assertIn("Receipt number 12", html)
+
+    def test_image_size_headers(self):
+        from valerius import media
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (640).to_bytes(4, "big") + (480).to_bytes(4, "big")
+        self.assertEqual(media.image_size(png), (640, 480))
+        self.assertEqual(media.image_size(b"nope"), (0, 0))

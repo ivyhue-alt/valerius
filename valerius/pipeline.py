@@ -15,6 +15,7 @@ from .types import Assessment, Message, Risk
 
 # Public Muse Spark 1.3 Standard prices, USD per 1M tokens (dev.meta.ai/models, Oct 2026).
 PRICE_IN, PRICE_OUT = 1.25, 4.25
+PREVIEW_MAX_BYTES = 2_000_000
 
 
 @dataclass
@@ -64,6 +65,12 @@ def read_media(msg: Message, data: bytes, mime: str = "", image_reader=None, tra
     if msg.kind == "image":
         reading = (image_reader or media_mod.read_image)(data)
         details = {"image_error": reading.error, "regions": reading.regions, "image_seconds": round(reading.seconds, 1)}
+        w, h = media_mod.image_size(data)
+        if w and h and len(data) <= PREVIEW_MAX_BYTES:
+            # Kept so the owner sees the evidence itself, with SAM's boxes drawn on it. Synthetic data only.
+            import base64 as _b64
+            from .intake import sniff
+            details["preview"] = {"mime": sniff(data)[1], "b64": _b64.b64encode(data).decode(), "w": w, "h": h}
         if not reading.error:
             msg = replace(msg, image_fields=reading.fields, media_read=True)
     elif msg.kind == "audio":
