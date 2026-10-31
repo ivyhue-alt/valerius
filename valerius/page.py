@@ -12,20 +12,73 @@ from .config import SETTINGS
 TOKEN_KEYS = ("c", "p", "e", "n", "s")  # only these fields are ever copied from a link into a form
 
 CSS = """
-:root{--bg:#f7f6f3;--card:#fff;--ink:#1c1b19;--muted:#6b6862;--line:#e6e3dc;--hold:#b4232c;--ok:#1d7a46;--mark:#fde68a;--accent:#2b4c7e}
-@media (prefers-color-scheme:dark){:root{--bg:#141413;--card:#1f1e1c;--ink:#f1efe9;--muted:#a19d94;--line:#34322e;--hold:#ef6a70;--ok:#5cc28b;--mark:#7a5d0c;--accent:#8fb0e6}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
-main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
-h1{font-size:1.3rem;margin:0 0 4px}h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 0 8px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-weight:600;font-size:.85rem;color:#fff;background:var(--hold)}
-.pill.ok{background:var(--ok)}.muted{color:var(--muted)}
-.msg{white-space:pre-wrap;word-wrap:break-word}mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 2px}
-ul{margin:0;padding-left:20px}li{margin:4px 0}
-.row{display:flex;gap:10px;margin-top:16px}button{flex:1;font:inherit;font-weight:600;padding:14px;border-radius:10px;border:0;cursor:pointer}
-.approve{background:var(--ok);color:#fff}.block{background:var(--hold);color:#fff}
-.small{font-size:.85rem}code{font-size:.85rem}
+:root{--paper:#eef1f6;--tag:#fff;--ink:#18213a;--soft:#5a6478;--rule:#d6dce6;--hold:#c0262d;--hold-bg:#fcecec;
+--warn:#8f5400;--warn-bg:#fff2dc;--clear:#1e7f4f;--clear-bg:#e5f4ec;--act:#2f4fd8;--mark:#ffe27a;
+--serif:Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,serif;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--paper:#0d1322;--tag:#161f36;--ink:#e8ecf4;--soft:#9aa3b8;--rule:#2a3550;
+--hold:#f0707a;--hold-bg:#3a1a22;--warn:#f2b45a;--warn-bg:#3a2a12;--clear:#5cc79a;--clear-bg:#12301f;--act:#93a6ff;--mark:#6b5410}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--sans);-webkit-text-size-adjust:100%}
+main{max-width:600px;margin:0 auto;padding:18px 16px 120px}
+a{color:var(--act);text-underline-offset:3px}
+:focus-visible{outline:3px solid var(--act);outline-offset:2px}
+h1{font:600 1.75rem/1.2 var(--serif);margin:6px 0 6px;letter-spacing:-.01em}
+h2{font:600 1.1rem/1.3 var(--serif);margin:28px 0 10px}
+p{margin:0 0 10px}.soft{color:var(--soft)}.small{font-size:.875rem}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:.875rem;color:var(--soft)}
+.brand{font:600 1rem var(--serif);color:var(--ink)}
+.state{display:inline-flex;align-items:center;gap:6px}.state::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--clear)}
+.state.paused::before{background:var(--hold)}
+.chip{display:inline-block;border-radius:6px;padding:1px 8px;font-size:.8rem;font-weight:600}
+.r-hold{color:var(--hold);background:var(--hold-bg)}.r-warn{color:var(--warn);background:var(--warn-bg)}.r-clear{color:var(--clear);background:var(--clear-bg)}
+.sheet{background:var(--tag);border:1px solid var(--rule);border-radius:12px;padding:14px 16px}
+.tag{position:relative;background:var(--tag);border:1px solid var(--rule);border-radius:14px;padding:16px 16px 0 34px;margin:0 0 14px}
+.tag::before{content:"";position:absolute;left:12px;top:20px;width:11px;height:11px;border-radius:50%;background:var(--paper);border:1px solid var(--rule)}
+.tag .amt{font:700 1.45rem/1.2 var(--sans);font-variant-numeric:tabular-nums;margin:6px 0 2px}
+.tag .why{color:var(--soft);font-size:.92rem}
+.tag .foot{border-top:2px dashed var(--rule);margin:14px -16px 0 -34px;padding:12px 16px 14px 34px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.quote{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.95rem}
+mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 2px}
+ul.plain{list-style:none;margin:0;padding:0}ul.plain li{padding:10px 0;border-top:1px solid var(--rule)}ul.plain li:first-child{border-top:0;padding-top:0}
+ul.tags{list-style:none;margin:16px 0 0;padding:0}
+ul.dots{margin:0;padding-left:20px}ul.dots li{margin:6px 0}
+.rec{font-size:.85rem;color:var(--soft)}code{font-size:.85rem}
+.log li{display:flex;gap:10px;align-items:baseline}.log .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn{display:inline-block;font:600 1rem var(--sans);padding:13px 18px;border-radius:10px;border:0;cursor:pointer;text-decoration:none;text-align:center}
+.go{background:var(--act);color:#fff}
+@media (prefers-color-scheme:dark){.go{color:#0d1322}}.approve{background:var(--clear);color:#fff}.block{background:var(--hold);color:#fff}
+.ghost{background:transparent;color:var(--hold);border:1.5px solid var(--hold)}
+.decide{position:fixed;left:0;right:0;bottom:0;background:var(--tag);border-top:1px solid var(--rule);padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+.decide .in{max-width:600px;margin:0 auto}.decide .row{display:flex;gap:10px}.decide .btn{flex:1}
+details summary{cursor:pointer;font:600 1.1rem var(--serif);margin:28px 0 10px}
+textarea,input[type=password],input[type=text]{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid var(--rule);background:var(--tag);color:var(--ink)}
+label{display:block;font-weight:600;margin:18px 0 6px}
+.verdict{border-radius:14px;padding:18px;margin:10px 0 16px}
+.foot-note{margin-top:28px;font-size:.85rem;color:var(--soft)}
+@media (prefers-reduced-motion:no-preference){.tag.new{animation:in .35s ease-out}@keyframes in{from{transform:translateY(6px);opacity:0}}}
 """
+
+
+def _risk_class(risk: str) -> str:
+    return {"CRITICAL": "r-hold", "HIGH": "r-hold", "MEDIUM": "r-warn"}.get(str(risk).upper(), "r-clear")
+
+
+def _risk_label(risk: str) -> str:
+    return {"CRITICAL": "Critical", "HIGH": "High risk", "MEDIUM": "Worth a look", "LOW": "Low risk"}.get(str(risk).upper(), str(risk))
+
+
+def _chip(risk: str) -> str:
+    return f"<span class='chip {_risk_class(risk)}'>{escape(_risk_label(risk))}</span>"
+
+
+def _request(case: dict) -> str:
+    act = (case.get("requested_action") or "").replace("_", " ")
+    amt = case.get("amount_usd")
+    if act and amt is not None:
+        return f"{act.capitalize()} ${float(amt):,.2f}"
+    if act:
+        return act.capitalize()
+    return "Forwarded message" if case.get("channel") == "family" else "Message"
 
 
 def _highlight(text: str, quotes: list[str]) -> str:
@@ -53,9 +106,11 @@ def _highlight(text: str, quotes: list[str]) -> str:
     return "".join(out)
 
 
-def _shell(title: str, body: str) -> str:
-    return (f"<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
-            f"<meta name=robots content=noindex><title>{escape(title)}</title><style>{CSS}</style></head><body><main>{body}</main></body></html>")
+def _shell(title: str, body: str, after: str = "") -> str:
+    return (f"<!doctype html><html lang=en><head><meta charset=utf-8>"
+            f"<meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'>"
+            f"<meta name=robots content=noindex><meta name=theme-color content='#18213a'><title>{escape(title)}</title>"
+            f"<style>{CSS}</style></head><body><main>{body}</main>{after}</body></html>")
 
 
 def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
@@ -67,23 +122,21 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
         quotes += mr.get("quotes", [])
 
     held = case.get("status") == "held"
-    status = f"<span class='pill{'' if held else ' ok'}'>{escape(str(case.get('status', '?')).upper())}</span>"
-    action = ""
-    if case.get("requested_action"):
-        amt = f" of ${case['amount_usd']:,.2f}" if case.get("amount_usd") is not None else ""
-        action = f"<p><b>Requested:</b> {escape(case['requested_action'].replace('_', ' '))}{escape(amt)}</p>"
 
     rules = "".join(
-        f"<li>{escape(f['reason'])} <span class='muted small'>({escape(f['rule'])}, {escape(f['risk'])})</span>"
-        + "".join(f"<br><span class='small muted'>record: <code>{escape(e['field'])} = {escape(e['value'])}</code></span>"
+        f"<li>{escape(f['reason'][:1].upper() + f['reason'][1:])} {_chip(f['risk'])}"
+        + "".join(f"<div class=rec>Record: <code>{escape(e['field'])} = {escape(e['value'])}</code></div>"
                   for e in f["evidence"] if e.get("field"))
-        + "</li>" for f in case.get("findings", [])) or "<li class=muted>No rule fired.</li>"
-    gaps = "".join(f"<li>Could not verify: {escape(g)}</li>" for g in case.get("unverified", []))
+        + "</li>" for f in case.get("findings", [])) or "<li class=soft>No rule fired.</li>"
+    gaps = "".join(f"<li>Couldn't check: {escape(g)}</li>" for g in case.get("unverified", []))
+    names = {"muse-spark": "Muse Spark", "muse-spark-open": "Muse Spark Open (argues the other side)"}
     models = "".join(
-        f"<li><b>{escape(src)}</b>: {escape(case.get('models', {}).get(src, ''))} &middot; {escape('; '.join(mr.get('reasons', [])))}</li>"
+        f"<li><b>{escape(names.get(src, src))}</b> {_chip(case.get('models', {}).get(src, ''))}"
+        f"<div class=small>{escape('; '.join(mr.get('reasons', [])))}</div></li>"
         for src, mr in case.get("model_reasons", {}).items())
-    disagree = "<p><b>The two model reviews disagree, so a person decides.</b></p>" if case.get("disagreement") else ""
-    paused = "<p><b>The agent is paused.</b> Every requested action is held until you resume it.</p>" if case.get("paused_agent") else ""
+    disagree = ("<p class='chip r-warn'>The two reviews disagree, so you decide.</p>" if case.get("disagreement") else "")
+    paused = ("<p class='sheet r-hold'><b>Your agent is paused.</b> Every action it asks for waits for you.</p>"
+              if case.get("paused_agent") else "")
 
     media_card = ""
     fields = case.get("image_fields") or {}
@@ -92,80 +145,91 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
         from .textnorm import scrub_model_text
         rows = []
         if fields.get("vendor_or_sender"):
-            rows.append(f"From: {escape(scrub_model_text(fields['vendor_or_sender']))}")
+            rows.append(f"From {escape(scrub_model_text(fields['vendor_or_sender']))}")
         if fields.get("total_usd") is not None:
             rows.append(f"Total shown: ${float(fields['total_usd']):,.2f}")
         if fields.get("account_last4"):
-            rows.append(f"Account ending: {escape(str(fields['account_last4']))}")
+            rows.append(f"Pay to account ending {escape(str(fields['account_last4']))}")
         if fields.get("visible_text_summary"):
             rows.append(f"Says: {escape(scrub_model_text(fields['visible_text_summary']))}")
         found = [p for p, boxes in regions.items() if boxes]
         if found:
-            rows.append("SAM 3.1 located: " + escape(", ".join(found)))
-        media_card = ("<h2>What the image shows</h2><div class=card><ul>" + "".join(f"<li>{r}</li>" for r in rows) +
-                      "</ul><p class='small muted'>Read by Muse Spark and SAM 3.1. Instructions inside images are ignored.</p></div>")
+            rows.append("Found in the picture: " + escape(", ".join(found)))
+        media_card = ("<h2>What the picture shows</h2><div class=sheet><ul class=plain>"
+                      + "".join(f"<li>{r}</li>" for r in rows) +
+                      "</ul><p class='small soft' style='margin-top:10px'>Read by Muse Spark and SAM 3.1. "
+                      "Instructions written inside images are ignored.</p></div>")
 
     policy = ""
     if case.get("channel") == "business":
         lines = "".join(f"<li>{escape(x)}</li>" for x in SETTINGS.policy.lines())
-        policy = f"<h2>Your rules ({escape(SETTINGS.policy.business_name)})</h2><div class=card><ul>{lines}</ul></div>"
+        policy = f"<details><summary>Your rules</summary><div class=sheet><ul class=dots>{lines}</ul></div></details>"
 
-    buttons = ""
+    decide_bar = ""
     if held:
         hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(token.get(k, '')))}'>" for k in TOKEN_KEYS)
-        buttons = (f"<form method=post action='/case/{escape(str(case.get('id', '')))}/decide'>{hidden}<div class=row>"
-                   "<button class=approve name=decision value=approve>Approve</button>"
-                   "<button class=block name=decision value=block>Block</button></div></form>"
-                   "<p class='small muted'>This link works once and expires in 2 hours. Nothing happens until you choose.</p>")
+        decide_bar = (f"<form class=decide method=post action='/case/{escape(str(case.get('id', '')))}/decide'>{hidden}"
+                      "<div class=in><div class=row>"
+                      "<button class='btn approve' name=decision value=approve>Approve</button>"
+                      "<button class='btn block' name=decision value=block>Block</button></div>"
+                      "<p class='small soft' style='margin:8px 0 0;text-align:center'>Nothing happens until you choose. "
+                      "This link works once and expires in 2 hours.</p></div></form>")
 
-    track = (f"<p class='small muted'>This agent so far: {record['held']} held, {record['approved']} approved, "
+    track = (f"<p class='small soft'>This agent so far: {record['held']} held, {record['approved']} approved, "
              f"{record['blocked']} blocked.</p>") if case.get("channel") == "business" else ""
 
     switch = ""
     if case.get("channel") == "business" and agent_token:
         hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(agent_token.get(k, '')))}'>" for k in TOKEN_KEYS)
         verb, path = ("Resume agent", "resume") if agent_paused else ("Pause agent", "pause")
-        note = ("The agent is paused: every requested action is held." if agent_paused
-                else "Something wrong? Pausing holds every action the agent asks for until you resume it.")
-        switch = (f"<h2>Agent</h2><div class=card><p class=small>{escape(note)}</p>"
-                  f"<form method=post action='/agent/{path}'>{hidden}<button class=block>{verb}</button></form></div>")
+        note = ("Your agent is paused. Every action it asks for waits for you." if agent_paused
+                else "Something feels off? Pausing makes every action the agent asks for wait for you.")
+        switch = (f"<h2>Your agent</h2><div class=sheet><p class=small>{escape(note)}</p>"
+                  f"<form method=post action='/agent/{path}'>{hidden}<button class='btn ghost'>{verb}</button></form></div>")
 
-    body = (f"<h1>Valerius review {status}</h1><p class=muted>Risk: <b>{escape(str(case.get('risk', '?')))}</b> &middot; case {escape(str(case.get('id', '')))}</p>"
-            f"{paused}{action}<h2>The message</h2><div class='card msg'>{_highlight(case.get('text', ''), quotes)}</div>"
-            f"<h2>Why it was held</h2><div class=card><ul>{rules}{gaps}</ul></div>"
-            + (f"<h2>Model reviews</h2><div class=card>{disagree}<ul>{models}</ul></div>" if models or disagree else "")
-            + f"{media_card}{policy}{buttons}{track}{switch}"
-            "<p class='small muted'>The model can advise. It can't approve. Personal details were removed before review.</p>")
-    return _shell("Valerius review", body)
+    state = "Waiting for you" if held else str(case.get("status", "")).capitalize()
+    body = (f"<div class=top><span class=brand>Valerius</span><span>Case {escape(str(case.get('id', '')))}</span></div>"
+            f"<div class='tag new'><div>{_chip(case.get('risk', ''))} <span class='small soft'>{escape(state)}</span></div>"
+            f"<div class=amt>{escape(_request(case))}</div>"
+            f"<div class=foot><div class=quote>{_highlight(case.get('text', ''), quotes)}</div></div></div>"
+            f"{paused}<h2>Why it was held</h2><div class=sheet><ul class=plain>{rules}{gaps}</ul></div>"
+            + (f"<h2>Two model reviews</h2><div class=sheet>{disagree}<ul class=plain>{models}</ul></div>" if models or disagree else "")
+            + f"{media_card}{policy}{track}{switch}"
+            "<p class=foot-note>The models advise. Only you approve. Personal details were removed before review.</p>")
+    return _shell("Valerius review", body, decide_bar)
 
 
 def result_page(title: str, detail: str) -> str:
-    return _shell(title, f"<h1>{escape(title)}</h1><p>{escape(detail)}</p>")
+    return _shell(title, f"<div class=top><span class=brand>Valerius</span></div><h1>{escape(title)}</h1><p>{escape(detail)}</p>")
 
 
 def intake_form(error: str = "") -> str:
-    err = f"<p class=card style='border-color:var(--hold)'><b>{escape(error)}</b></p>" if error else ""
+    err = f"<p class='sheet r-hold'>{escape(error)}</p>" if error else ""
     body = (
-        "<h1>Is this a scam?</h1><p class=muted>Paste a message you received, or add a screenshot or voice note. "
-        "Valerius checks it and tells you what it found.</p>" + err +
+        "<div class=top><span class=brand>Valerius</span></div>"
+        "<h1>Got a message that feels off?</h1>"
+        "<p class=soft>Paste it here, or add the screenshot or voice note. You'll get a plain answer in about 15 seconds.</p>"
+        + err +
         "<form method=post action='/check' enctype='multipart/form-data'>"
-        "<h2>The message</h2><textarea name=text rows=6 maxlength=4000 "
-        "style='width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)'></textarea>"
-        "<h2>Screenshot or voice note (optional)</h2>"
-        "<input type=file name=file accept='image/jpeg,image/png,image/webp,audio/*'>"
-        "<h2>Access code</h2><input name=code type=password autocomplete=off required "
-        "style='width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)'>"
-        "<div class=row><button class=approve>Check it</button></div></form>"
-        "<p class='small muted'>Personal details are removed before review. Use made-up or test messages only.</p>")
+        "<label for=t>The message</label><textarea id=t name=text rows=6 maxlength=4000 "
+        "placeholder='Paste what they sent you'></textarea>"
+        "<label for=f>Screenshot or voice note <span class=soft>(optional)</span></label>"
+        "<input id=f type=file name=file accept='image/jpeg,image/png,image/webp,audio/*'>"
+        "<label for=c>Access code</label><input id=c name=code type=password autocomplete=off required>"
+        "<p style='margin-top:20px'><button class='btn go' style='width:100%'>Check this message</button></p></form>"
+        "<p class=foot-note>Personal details are removed before review. Use made-up or test messages only.</p>")
     return _shell("Valerius check", body)
 
 
 def intake_result(risk: str, held: bool, reply: str, link: str = "") -> str:
-    pill = f"<span class='pill{'' if held else ' ok'}'>{escape(risk)}</span>"
-    review = (f"<p><a href='{escape(link)}'>Open the review</a> to see the evidence and approve or block. "
+    tone = _risk_class(risk) if (held or str(risk).upper() != "LOW") else "r-clear"
+    head = {"r-hold": "Don't act on this yet", "r-warn": "Be careful with this one"}.get(tone, "No common scam signs")
+    review = (f"<p><a class='btn go' href='{escape(link)}'>See the evidence</a></p>"
+              "<p class='small soft'>That page shows what was found and lets you approve or block. "
               "The link works once and expires in 2 hours.</p>") if held and link else ""
-    body = (f"<h1>Valerius says {pill}</h1><div class=card><p>{escape(reply)}</p></div>{review}"
-            "<p><a href='/check'>Check another message</a></p>")
+    body = ("<div class=top><span class=brand>Valerius</span></div>"
+            f"<div class='verdict {tone}'><h1 style='margin:0 0 8px'>{escape(head)}</h1><p style='margin:0;color:var(--ink)'>{escape(reply)}</p></div>"
+            f"{review}<p><a href='/check'>Check another message</a></p>")
     return _shell("Valerius check", body)
 
 
@@ -180,52 +244,55 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
             mins = max(0, int((_time.time() - int(ts)) // 60))
         except (TypeError, ValueError):
             return ""
-        return f"{mins} min ago" if mins < 60 else f"{mins // 60} h ago" if mins < 1440 else f"{mins // 1440} d ago"
+        return "just now" if mins < 1 else f"{mins} min ago" if mins < 60 else \
+            f"{mins // 60} h ago" if mins < 1440 else f"{mins // 1440} d ago"
 
-    def row(c: dict, action: str = "") -> str:
-        risk = escape(str(c.get("risk", "")))
-        held = c.get("status") == "held"
-        reason = (c.get("findings") or [{}])[0].get("reason", "") or ("could not verify everything" if c.get("unverified") else "")
-        what = ""
-        if c.get("requested_action"):
-            amt = f" ${float(c['amount_usd']):,.2f}" if c.get("amount_usd") is not None else ""
-            what = f"<b>{escape(c['requested_action'].replace('_', ' '))}{escape(amt)}</b> &middot; "
-        snippet = scrub_model_text(str(c.get("text", "")))[:90]
-        return (f"<li style='list-style:none;margin:0 0 10px;padding:0'><div class=card>"
-                f"<span class='pill{'' if held else ' ok'}'>{risk}</span> "
-                f"<span class='small muted'>{escape(str(c.get('status', '')))} &middot; {escape(when(c.get('created_at')))} &middot; "
-                f"{escape(str(c.get('channel', '')))}</span>"
-                f"<p style='margin:8px 0 4px'>{what}{escape(snippet)}</p>"
-                f"<p class='small muted' style='margin:0'>{escape(reason)}</p>{action}</div></li>")
+    def reason(c: dict) -> str:
+        return (c.get("findings") or [{}])[0].get("reason", "") or ("couldn't check everything" if c.get("unverified") else "")
+
+    def tag(c: dict) -> str:
+        link = review_links.get(c.get("id", ""))
+        snippet = scrub_model_text(str(c.get("text", "")))[:110]
+        go = f"<a class='btn go' href='{escape(link)}'>Review</a>" if link else ""
+        return (f"<li class=tag><div>{_chip(c.get('risk', ''))} <span class='small soft'>{escape(when(c.get('created_at')))}</span></div>"
+                f"<div class=amt>{escape(_request(c))}</div><div class=why>{escape(reason(c).capitalize())}</div>"
+                f"<div class=foot><span class='small soft' style='flex:1;min-width:0'>&ldquo;{escape(snippet)}&rdquo;</span>{go}</div></li>")
+
+    def logrow(c: dict) -> str:
+        outcome = {"approved": "Approved", "blocked": "Blocked", "allowed": "Passed"}.get(str(c.get("status")), str(c.get("status")))
+        tone = {"Blocked": "r-hold", "Approved": "r-clear", "Passed": "r-clear"}.get(outcome, "r-warn")
+        return (f"<li><span class='chip {tone}'>{escape(outcome)}</span>"
+                f"<span class=txt>{escape(_request(c))}: {escape(scrub_model_text(str(c.get('text', '')))[:70])}</span>"
+                f"<span class='small soft'>{escape(when(c.get('created_at')))}</span></li>")
 
     waiting = [c for c in cases if c.get("status") == "held"]
     done = [c for c in cases if c.get("status") != "held"][:15]
-    waiting_html = "".join(
-        row(c, f"<p style='margin:10px 0 0'><a href='{escape(review_links[c['id']])}'>Review and decide</a></p>"
-            if c.get("id") in review_links else "") for c in waiting) or "<p class=muted>Nothing is waiting. </p>"
-    done_html = "".join(row(c) for c in done) or "<p class=muted>Nothing yet.</p>"
+    n = len(waiting)
+    headline = ("Nothing is waiting for you" if n == 0 else
+                "1 hold is waiting for you" if n == 1 else f"{n} holds are waiting for you")
+    waiting_html = (f"<ul class=tags>{''.join(tag(c) for c in waiting)}</ul>" if waiting else
+                    "<p class=soft>Your agent is handling everything within your rules. Holds show up here.</p>")
+    done_html = (f"<div class=sheet><ul class='plain log'>{''.join(logrow(c) for c in done)}</ul></div>" if done else
+                 "<p class=soft>Nothing handled yet.</p>")
 
-    stats = (f"<div class=row style='margin-top:8px'>"
-             + "".join(f"<div class=card style='flex:1;text-align:center'><div style='font-size:1.5rem;font-weight:700'>{n}</div>"
-                       f"<div class='small muted'>{label}</div></div>"
-                       for n, label in ((len(waiting), "waiting"), (record.get("approved", 0), "approved"),
-                                        (record.get("blocked", 0), "blocked")))
-             + "</div>")
     switch = ""
     if agent_token:
         hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(agent_token.get(k, '')))}'>" for k in TOKEN_KEYS)
         verb, path = ("Resume agent", "resume") if agent_paused else ("Pause agent", "pause")
-        note = "Paused: every action the agent asks for is held." if agent_paused else "Running under your rules."
-        switch = (f"<h2>Agent</h2><div class=card><p class=small>{escape(note)}</p>"
-                  f"<form method=post action='/agent/{path}'>{hidden}<button class=block>{verb}</button></form></div>")
+        note = ("Paused. Every action your agent asks for waits for you." if agent_paused else
+                "Something feels off? Pausing makes every action your agent asks for wait for you.")
+        switch = (f"<h2>Your agent</h2><div class=sheet><p class=small>{escape(note)}</p>"
+                  f"<form method=post action='/agent/{path}'>{hidden}<button class='btn ghost'>{verb}</button></form></div>")
     rules = "".join(f"<li>{escape(x)}</li>" for x in SETTINGS.policy.lines())
-    body = (f"<h1>{escape(SETTINGS.policy.business_name)} &middot; Valerius</h1>"
-            "<p class='small muted'>Refreshes every 30 seconds. Save this page to your home screen.</p>"
-            f"{stats}<h2>Waiting for you</h2><ul style='padding:0'>{waiting_html}</ul>"
-            f"<h2>Recently handled</h2><ul style='padding:0'>{done_html}</ul>{switch}"
-            f"<h2>Your rules</h2><div class=card><ul>{rules}</ul></div>"
-            "<p class='small muted'>View only. Approve and Block happen on each case's own page, with a link that works once.</p>")
-    html = _shell("Valerius owner", body)
+    state = (f"<span class='state paused'>Agent paused</span>" if agent_paused else "<span class=state>Agent running</span>")
+    body = (f"<div class=top><span class=brand>{escape(SETTINGS.policy.business_name)}</span>{state}</div>"
+            f"<h1>{escape(headline)}</h1>"
+            f"<p class='small soft'>So far: {record.get('approved', 0)} approved, {record.get('blocked', 0)} blocked.</p>"
+            f"{waiting_html}<h2>Recently handled</h2>{done_html}{switch}"
+            f"<details><summary>Your rules</summary><div class=sheet><ul class=dots>{rules}</ul></div></details>"
+            "<p class=foot-note>This page refreshes every 30 seconds and only shows. "
+            "Approve and Block happen on each case's own page, with a link that works once.</p>")
+    html = _shell("Valerius", body)
     return html.replace("<meta name=robots content=noindex>",
                         "<meta name=robots content=noindex><meta http-equiv=refresh content=30>"
                         "<meta name=apple-mobile-web-app-capable content=yes>", 1)

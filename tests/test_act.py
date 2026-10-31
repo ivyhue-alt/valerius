@@ -189,7 +189,7 @@ class Server(Base):
         server.handle_incoming(whatsapp.fake_webhook(SCAM), self.store, use_models=False)
         status, html = self.get("/owner?" + urllib.parse.urlencode(act.dashboard_token()))
         self.assertEqual(status, 200)
-        self.assertIn("Review and decide", html)
+        self.assertIn(">Review<", html)
         self.assertEqual(self.get("/owner")[0], 403)
         self.assertEqual(self.get("/owner?" + urllib.parse.urlencode(act.sign("owner", "decide")))[0], 403)
 
@@ -253,7 +253,7 @@ class OwnerDashboard(unittest.TestCase):
                  {"id": "bbbbbbbbbbbb", "status": "blocked", "risk": "HIGH", "channel": "family", "text": "hi"}]
         html = page.owner_dashboard(cases, {"approved": 1, "blocked": 1}, {"aaaaaaaaaaaa": "http://x/case/aaaaaaaaaaaa?c=1"},
                                     None, False)
-        self.assertIn("Review and decide", html)
-        self.assertIn("over the limit", html)
+        self.assertIn(">Review<", html)
+        self.assertIn("Over the limit", html)
         self.assertNotIn("<script>x", html)
         self.assertIn("http-equiv=refresh", html)

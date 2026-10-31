@@ -62,13 +62,13 @@ class WebIntake(attacks.Server):
 
     def test_form_page(self):
         with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/check") as r:
-            self.assertIn("Is this a scam?", r.read().decode())
+            self.assertIn("feels off", r.read().decode())
 
     def test_scam_is_held_with_review_link(self):
         status, html = self.send({"code": b"letmein", "text": SCAM.encode()})
         self.assertEqual(status, 200)
         self.assertIn("looks like a scam", html)
-        self.assertIn("Open the review", html)
+        self.assertIn("See the evidence", html)
         self.assertEqual(len(list((self.store.root / "cases").glob("*.json"))), 1)
 
     def test_wrong_code_refused_and_nothing_recorded(self):
