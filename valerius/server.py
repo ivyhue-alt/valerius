@@ -179,7 +179,7 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/owner":
             if not act.dashboard_ok(q):
                 return self._send(403, page.result_page("Link not valid", "This dashboard link is not valid or has expired."))
-            cases = act.recent_cases(STORE)
+            cases = act.recent_cases(STORE, limit=2000)
             links = {c["id"]: act.link(act.sign(c["id"], "decide")) for c in cases if c.get("status") == "held"}
             agent = STORE.agent()
             from urllib.parse import urlencode

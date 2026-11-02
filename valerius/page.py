@@ -72,6 +72,17 @@ label{display:block;font-size:.9rem;color:var(--soft);margin:16px 0 6px}
 .section{font-size:.85rem;color:var(--soft);font-weight:600;margin:30px 0 0}
 .ok{color:var(--go)}.bad{color:var(--stop)}
 .done{width:56px;height:56px;border-radius:50%;background:var(--fill);display:grid;place-items:center;font-size:1.6rem;margin:6px 0 18px}
+.tabs{display:flex;gap:6px;margin:-8px 0 22px}.tabs a{padding:8px 14px;border-radius:999px;color:var(--soft);font-size:.92rem}
+.tabs a.on{background:var(--fill);color:var(--ink);font-weight:600}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px}
+.stat{background:var(--fill);border-radius:14px;padding:14px}
+.stat b{display:block;font-size:1.6rem;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat span{font-size:.85rem;color:var(--soft)}
+.bars{list-style:none;margin:10px 0 0;padding:0}.bars li{margin:0 0 14px}
+.bars .top2{display:flex;justify-content:space-between;font-size:.95rem}
+.bar{height:8px;border-radius:4px;background:var(--fill);margin:6px 0 4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ink);border-radius:4px}
+.bars q{display:block;font-size:.85rem;color:var(--soft);quotes:"\\201C" "\\201D"}
 .receipt{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;overflow-wrap:anywhere;color:var(--soft)}
 .foot{margin-top:30px;font-size:.82rem;color:var(--faint)}
 .chip{font-size:.8rem;font-weight:600}.r-hold{color:var(--stop)}.r-warn{color:var(--warn)}.r-clear{color:var(--go)}
@@ -149,7 +160,7 @@ def _ago(ts, now: int | None = None) -> str:
     except (TypeError, ValueError):
         return ""
     return "just now" if mins < 1 else f"{mins} min ago" if mins < 60 else \
-        f"{mins // 60} h ago" if mins < 1440 else f"{mins // 1440} days ago"
+        f"{mins // 60} h ago" if mins < 1440 else ("1 day ago" if mins < 2880 else f"{mins // 1440} days ago")
 
 
 def _date(ts) -> str:
@@ -228,9 +239,32 @@ def _evidence_image(case: dict) -> str:
             "Instructions written inside images are ignored.</p>")
 
 
+PERSON = ("<svg viewBox='0 0 24 24' width=20 height=20 aria-hidden=true fill='currentColor'>"
+          "<circle cx=12 cy=8 r=4 /><path d='M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z'/></svg>")
+
+
 def _initial(case: dict) -> str:
     n = (case.get("customer_name") or "").strip()
-    return escape(n[:1].upper()) if n else "?"
+    return escape(n[:1].upper()) if n else PERSON
+
+
+def _name(case: dict) -> str:
+    """Never 'A customer' on a list: the name, else the order number, else the last digits of their number."""
+    if case.get("customer_name"):
+        return case["customer_name"]
+    order = (case.get("order") or {}).get("order_id")
+    if order:
+        return f"Order {order}"
+    cid = str(case.get("customer_id") or "")
+    return f"Customer ending {cid[-4:]}" if len(cid) >= 4 else "Customer"
+
+
+def _amount_label(case: dict) -> str:
+    amt, act = case.get("amount_usd"), case.get("requested_action", "")
+    if amt is None:
+        return ""
+    word = {"refund": "refund", "reship": "replacement", "cancel": "order"}.get(act, "")
+    return f"${float(amt):,.0f}" + (f" {word}" if word else "")
 
 
 def _ordinal(n: int) -> str:
@@ -446,9 +480,9 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
         amt = c.get("amount_usd")
         r = voice.reasons(c, limit=1)
         line = (r[0][:1].upper() + r[0][1:]) if r else "Your rules say you decide this one"
-        inner = (f"<div class=av>{_initial(c)}</div><div class=main><div class=name>{escape(voice.who(c))}</div>"
-                 f"<div class=line>{escape(_what(c).capitalize())}. {escape(line)}.</div></div>"
-                 f"<div class=right>{f'${float(amt):,.0f}' if amt is not None else ''}"
+        inner = (f"<div class=av>{_initial(c)}</div><div class=main><div class=name>{escape(_name(c))}</div>"
+                 f"<div class=line>{escape(line)}.</div></div>"
+                 f"<div class=right>{escape(_amount_label(c))}"
                  f"<small>{'overnight' if c.get('after_hours') else escape(_ago(c.get('created_at')))}</small></div>")
         cls = " class=urgent" if c.get("risk") == "CRITICAL" else ""
         return f"<li{cls}><a href='{escape(link)}' aria-label='Review and decide'>{inner}</a></li>" if link else f"<li{cls}><div class=row>{inner}</div></li>"
@@ -458,10 +492,11 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
         outcome = {"approved": ("ok", "You said yes"), "blocked": ("bad", "You said no"),
                    "allowed": ("ok", "Handled by your agent")}.get(status, ("", status))
         amt = c.get("amount_usd")
-        return (f"<li><div class=row><div class=av>{_initial(c)}</div><div class=main><div class=name>{escape(voice.who(c))}</div>"
+        return (f"<li><div class=row><div class=av>{_initial(c)}</div><div class=main><div class=name>{escape(_name(c))}</div>"
                 f"<div class='line {outcome[0]}'>{escape(outcome[1])}</div></div>"
-                f"<div class=right>{f'${float(amt):,.0f}' if amt is not None else ''}<small>{escape(_ago(c.get('created_at')))}</small></div></div></li>")
+                f"<div class=right>{escape(_amount_label(c))}<small>{escape(_ago(c.get('created_at')))}</small></div></div></li>")
 
+    all_cases = cases
     cases = [c for c in cases if c.get("channel") == "business"]  # family scam alerts go to the family contact, not the store
     waiting = sorted([c for c in cases if c.get("status") == "held"],
                      key=lambda c: (c.get("risk") != "CRITICAL", -int(c.get("created_at", 0))))
@@ -482,12 +517,52 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
                   f"<button class='btn no'>{verb}</button></form></div></details>")
     state = ("<span><span class='dot off'></span>Agent paused</span>" if agent_paused else
              "<span><span class=dot></span>Agent on</span>")
-    body = (f"<div class=top><b>{escape(SETTINGS.policy.business_name)}</b>{state}</div>"
-            f"<h1>{escape(headline)}</h1>"
-            f"<p class=note>You've said yes {record.get('approved', 0)} times and no {record.get('blocked', 0)} times.</p>"
-            f"{waiting_html}{done_html}<div style='margin-top:30px'>{folds}</div>"
+    q = escape(tab_query)
+    tabs = (f"<nav class=tabs><a class='{'on' if view != 'insights' else ''}' href='/owner?{q}'>Needs you"
+            f"{f' ({n})' if n else ''}</a><a class='{'on' if view == 'insights' else ''}' href='/owner?{q}&amp;view=insights'>"
+            "Insights</a></nav>")
+    if view == "insights":
+        main = insights_view(all_cases)
+    else:
+        main = (f"<h1>{escape(headline)}</h1>{waiting_html}{done_html}")
+    body = (f"<div class=top><b>{escape(SETTINGS.policy.business_name)}</b>{state}</div>{tabs}"
+            f"{main}<div style='margin-top:30px'>{folds}</div>"
             "<p class=foot>Updates every 30 seconds.</p>")
     html = _shell("Valerius", body)
     return html.replace("<meta name=robots content=noindex>",
                         "<meta name=robots content=noindex><meta http-equiv=refresh content=30>"
                         "<meta name=apple-mobile-web-app-capable content=yes>", 1)
+
+
+def insights_view(cases: list[dict]) -> str:
+    """What the owner learns from the last 30 days, in plain numbers."""
+    from . import insights
+    d = insights.build(cases)
+    money = lambda x: f"${x:,.0f}"  # noqa: E731
+    if not d["requests"]:
+        return ("<h1>Insights</h1><p class=note>Nothing in the last 30 days yet. As your agent handles requests, "
+                "you'll see what comes back, why, and what it costs you.</p>")
+    handled = round(100 * d["handled_alone"] / d["requests"]) if d["requests"] else 0
+    html = (f"<h1>Your last {d['days']} days</h1>"
+            f"<p class=note>Your agent handled {d['handled_alone']} of {d['requests']} requests on its own ({handled}%). "
+            f"{d['waited_for_you']} waited for you.</p>"
+            "<div class=stats>"
+            f"<div class=stat><b>{money(d['refunded_usd'])}</b><span>refunded</span></div>"
+            f"<div class=stat><b>{money(d['kept_usd'])}</b><span>kept (refunds you said no to)</span></div>"
+            f"<div class=stat><b>{money(d['fees_usd'])}</b><span>card fees on refunds (estimate)</span></div>"
+            f"<div class=stat><b>{d['returns']}</b><span>returns and replacements asked for</span></div></div>"
+            + (f"<p class=note><span class=flag>{d['fraud']} looked like fraud</span> (someone posing as staff, or trying "
+               "to trick your agent). They're left out of the return reasons below.</p>" if d["fraud"] else ""))
+    if d["reasons"]:
+        html += "<div class=section>Why things come back</div><ul class=bars>" + "".join(
+            f"<li><div class=top2><span>{escape(r['reason'])}</span><span>{r['count']}</span></div>"
+            f"<div class=bar><i style='width:{r['share']}%'></i></div>"
+            + (f"<q>{escape(r['quote'])}</q>" if r["quote"] else "") + "</li>" for r in d["reasons"]) + "</ul>"
+    if d["products"]:
+        html += "<div class=section>Products that come back most</div><ul class=lines>" + "".join(
+            f"<li>{escape(p['name'])}: {p['count']}</li>" for p in d["products"]) + "</ul>"
+    if d["repeat"]:
+        html += "<div class=section>Customers who claim most often</div><ul class=lines>" + "".join(
+            f"<li>{escape(r['who'])}: {r['count']} claims, {money(r['usd'])} asked for</li>" for r in d["repeat"]) + "</ul>"
+    html += ("<p class=foot>Sales made through your agent will show here once Valerius is connected to your store's orders.</p>")
+    return html
