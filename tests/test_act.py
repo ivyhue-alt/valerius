@@ -186,10 +186,12 @@ class Server(Base):
         self.assertEqual(self.get("/health"), (200, "ok"))
 
     def test_owner_dashboard_needs_its_link(self):
-        server.handle_incoming(whatsapp.fake_webhook(SCAM), self.store, use_models=False)
+        server.handle_incoming(whatsapp.fake_webhook(SCAM), self.store, use_models=False)   # a family alert
+        act.open_case(pipeline.run(REFUND), self.store)                                     # a store hold
         status, html = self.get("/owner?" + urllib.parse.urlencode(act.dashboard_token()))
         self.assertEqual(status, 200)
         self.assertIn("tap to decide", html)
+        self.assertNotIn("scam", html.lower().split("<main>")[1])   # the store never sees family alerts
         self.assertEqual(self.get("/owner")[0], 403)
         self.assertEqual(self.get("/owner?" + urllib.parse.urlencode(act.sign("owner", "decide")))[0], 403)
 
@@ -296,3 +298,21 @@ class OwnerScreens(unittest.TestCase):
         png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (640).to_bytes(4, "big") + (480).to_bytes(4, "big")
         self.assertEqual(media.image_size(png), (640, 480))
         self.assertEqual(media.image_size(b"nope"), (0, 0))
+
+
+class CustomerHearsBack(unittest.TestCase):
+    def test_decline_and_approve_notes(self):
+        from valerius import voice
+        case = {"channel": "business", "customer_name": "Dana", "requested_action": "refund", "amount_usd": 480,
+                "status": "blocked"}
+        no = voice.customer_note(case)
+        self.assertIn("Hi Dana", no)
+        self.assertNotIn("get back to", no)
+        self.assertNotIn("Thank", no)
+        self.assertIn("on its way", voice.customer_note(dict(case, status="approved")))
+        self.assertEqual(voice.customer_note(dict(case, channel="family")), "")
+
+    def test_bulk_wording_is_neutral(self):
+        from valerius import voice
+        f = {"rule": "reseller_pattern", "evidence": [{"field": "quantity", "value": "12"}]}
+        self.assertEqual(voice.reason(f), "big returns are your call")

@@ -362,7 +362,9 @@ def receipt_page(case: dict, receipt: dict | None) -> str:
             f"<div class=thread>"
             f"<div class='bubble big'>Done. {escape(voice.done(case))}</div>"
             f"<div class=bubble>{escape(result)}</div>"
-            f"<div class=bubble>I saved a receipt, in case anyone asks later.</div></div>"
+            + (f"<div class=quoted>What {escape(voice.who(case))} got:<div class=quote>{escape(case['customer_note'])}</div></div>"
+               if case.get("customer_note") else "")
+            + f"<div class=bubble>I saved a receipt, in case anyone asks later.</div></div>"
             f"{proof}<p class=foot-note>You can close this page.</p>")
     return _shell("Valerius receipt", body)
 
@@ -433,6 +435,7 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
             text = f"{voice.ask(c) if c.get('channel') == 'business' else 'A possible scam came in.'} You chose: {said}."
         return f"<li><div class=bubble style='max-width:100%'>{escape(text)}</div><div class=when>{escape(_ago(c.get('created_at')))}</div></li>"
 
+    cases = [c for c in cases if c.get("channel") == "business"]  # family scam alerts go to the family contact, not the store
     waiting = sorted([c for c in cases if c.get("status") == "held"],
                      key=lambda c: (c.get("risk") != "CRITICAL", -int(c.get("created_at", 0))))
     done = [c for c in cases if c.get("status") != "held"][:30]

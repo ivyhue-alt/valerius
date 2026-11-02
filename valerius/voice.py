@@ -27,8 +27,8 @@ def reason(f: dict) -> str:
     if r == "reseller_pattern":
         qty, refunds = _ev(f, "quantity"), _ev(f, "refunds_last_90d")
         if qty:
-            return f"it's a bulk order ({qty} items)"
-        return f"they've had {refunds} refunds lately" if refunds else "it looks like reselling"
+            return "big returns are your call"
+        return f"they've had {refunds} refunds in the last 90 days" if refunds else "big returns are your call"
     if r == "repeat_claims":
         prior = _ev(f, "prior_claims")
         return (f"it would be their {_ordinal(int(prior) + 1)} claim in {p.claim_window_days} days"
@@ -147,7 +147,8 @@ def if_yes(case: dict, fee: float | None) -> str:
     if case.get("channel") == "family":
         return "you've checked it yourself and it's fine. Nothing else happens."
     if act == "refund" and money:
-        return f"{money} goes back to them, and you're out about {fee_txt} in card fees." if fee_txt else f"{money} goes back to them."
+        to = case.get("customer_name") or "them"
+        return f"{money} goes back to {to}, and you're out about {fee_txt} in card fees." if fee_txt else f"{money} goes back to {to}."
     if act == "reship":
         return "a replacement goes out" + (f" ({money})" if money else "") + ", plus your shipping."
     if act == "cancel":
@@ -162,7 +163,34 @@ def if_yes(case: dict, fee: float | None) -> str:
 def if_no(case: dict) -> str:
     if case.get("channel") == "family":
         return "it stays marked as a scam. Nothing gets sent."
-    return "nothing moves. Your agent tells them someone will get back to them."
+    return f"nothing moves, and {who(case).lower() if who(case) == 'A customer' else who(case)} gets a note right away explaining why."
+
+
+def customer_note(case: dict) -> str:
+    """What the customer hears the moment the owner decides. Plain, no thank-yous, no filler."""
+    if case.get("channel") != "business":
+        return ""
+    name = case.get("customer_name") or "there"
+    act, amt = case.get("requested_action", ""), case.get("amount_usd")
+    money = f"${float(amt):,.2f}".replace(".00", "") if amt is not None else ""
+    approved = case.get("status") == "approved"
+    if act == "refund":
+        if approved:
+            return (f"Hi {name}, your {money + ' ' if money else ''}refund is on its way. "
+                    "It can take 5 to 10 business days to show up, depending on your bank.")
+        return (f"Hi {name}, I wish I could take care of this one, but a {money + ' ' if money else ''}refund isn't "
+                "something we can do this time. If you have questions about it, just reply here and we'll talk it through.")
+    if act == "reship":
+        return (f"Hi {name}, a replacement is on its way. You'll get tracking as soon as it ships." if approved else
+                f"Hi {name}, we're not able to send a replacement for this order. Reply here if you'd like to talk it through.")
+    if act == "cancel":
+        return (f"Hi {name}, your order is canceled." if approved else
+                f"Hi {name}, this order can't be canceled at this point. Reply here and we'll figure out the next step together.")
+    if act in ("payment_change", "account_change"):
+        return (f"Hi {name}, your account is updated." if approved else
+                f"Hi {name}, we couldn't make that change to your account. If it was you, reply here and we'll help.")
+    return (f"Hi {name}, you're all set." if approved else
+            f"Hi {name}, we can't do that one. Reply here if you have questions.")
 
 
 def buttons(case: dict) -> tuple[str, str]:

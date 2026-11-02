@@ -272,6 +272,8 @@ def decide(case_id: str, token: dict[str, str], decision: str, store: Store, act
         case["used_nonces"].append(token["n"])
         case["status"] = "approved" if decision == "approve" else "blocked"
         case["decision"] = {"by": actor, "at": int(time.time())}
+        from . import voice
+        case["customer_note"] = voice.customer_note(case)  # fixed wording only; sent through the store's channel
         store.save_case(case)
     store.append_receipt({"event": case["status"], "case_id": case_id, "message_sha256": sha256(case["text"]),
                           "rules": case["rules"], "models": case["models"], "actor": actor})
