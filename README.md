@@ -7,7 +7,22 @@ An independent supervisor for AI agents on WhatsApp. **The model can advise. It 
 
 Built for the Meta Global AI Developer Hackathon (Indie Developer track), Oct 26 to Nov 4, 2026, on the Meta Model API.
 
-> Status: in progress during the hackathon build window.
+
+## Results
+
+Measured once, on 70 locked test conversations (synthetic, hand-labeled, never used while building). The full run is in [`results/final_run.txt`](results/final_run.txt).
+
+| | Result | 95% range |
+|---|---|---|
+| Scams and risky requests caught | **34 of 35 (97%)** | 85% to 99% |
+| False alarms on normal messages | **0 of 35 (0%)** | 0% to 10% |
+| Muse Spark cost per message, at Standard prices | **$0.0062** | |
+| Model time | 3.6 s median, 13.6 s slowest | |
+| Cases where the two reviews disagreed, sent to a person | 6 | |
+
+The run missed one case, a bulk return of 12 limited sneakers. Valerius flagged the pattern but didn't hold it. After the final run I changed that rule (a refund on a bulk order now goes to the owner). I checked the fix on 10 new cases written and labeled afterwards: 10 of 10 on the first live run, 9 of 10 on the second (a harmless size change that one model rated too high). The locked result above stays as measured.
+
+Also: the repeat-claims scenarios (`scripts/run_scenarios.py`) pass 25 of 25 steps, and there are 160 automated tests, 32 of them attacks.
 
 ## The one rule
 
@@ -62,6 +77,8 @@ The WhatsApp webhook is built and tested against Meta's webhook format, with sig
 5. `verify_receipts.py` reruns the rules on every case and checks the chain. No model is needed to check a decision.
 
 The owner can also pause the agent: every action it asks for is then held until they resume it.
+
+The customer hears back the moment the owner decides. The owner sees both drafts (yes and no) on the decision page and can change either one first, for a sick family member or a hard week. A yes on something outside the owner's rules tells the customer it's a one-time courtesy.
 
 ## Design choices
 

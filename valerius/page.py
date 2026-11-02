@@ -295,6 +295,7 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
            + "</div></details>")
 
     decide_bar = ""
+    notes = ""
     if held:
         yes, no = voice.buttons(case)
         hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(token.get(k, '')))}'>" for k in TOKEN_KEYS)
@@ -303,7 +304,17 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
         except ValueError:
             left = 0
         expires = f"{left // 60} h {left % 60} min" if left >= 60 else f"{left} min"
-        decide_bar = (f"<form class=decide method=post action='/case/{escape(str(case.get('id', '')))}/decide'>{hidden}"
+        notes = ""
+        if case.get("channel") == "business":
+            name = escape(voice.who(case))
+            yes_note = voice.customer_note(dict(case, status="approved"))
+            no_note = voice.customer_note(dict(case, status="blocked"))
+            notes = ("<details open><summary>What " + name + " will get</summary><div class=sheet>"
+                     "<p class='small soft'>Change anything before you decide. A sick kid, a hard week: say so in your words.</p>"
+                     f"<label for=ny>If you say yes</label><textarea id=ny name=note_yes rows=6 maxlength=1200 form=decide-form>{escape(yes_note)}</textarea>"
+                     f"<label for=nn>If you say no</label><textarea id=nn name=note_no rows=6 maxlength=1200 form=decide-form>{escape(no_note)}</textarea>"
+                     "</div></details>")
+        decide_bar = (f"<form id=decide-form class=decide method=post action='/case/{escape(str(case.get('id', '')))}/decide'>{hidden}"
                       "<div class=in><div class=row>"
                       f"<button class='btn approve' name=decision value=approve>{escape(yes)}</button>"
                       f"<button class='btn block' name=decision value=block>{escape(no)}</button></div>"
@@ -325,7 +336,7 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
     name = SETTINGS.policy.business_name if case.get("channel") == "business" else "Valerius"
     body = (f"<div class=top><span class=brand>{escape(name)}</span><span>{escape(_ago(case.get('created_at'), now))}</span></div>"
             f"{'<div class=from>From Valerius</div>' if name != 'Valerius' else ''}<div class=thread>{''.join(bubbles)}</div>"
-            f"{timeline}{how}{policy}{switch}"
+            f"{notes if held else ''}{timeline}{how}{policy}{switch}"
             "<p class=foot-note>I check, you decide. Personal details were taken out before anything was reviewed.</p>")
     return _shell("Valerius", body, decide_bar)
 

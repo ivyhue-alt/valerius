@@ -257,7 +257,19 @@ def open_case(result: Result, store: Store, now: int | None = None) -> dict:
     return case
 
 
-def decide(case_id: str, token: dict[str, str], decision: str, store: Store, actor: str = "owner") -> tuple[bool, str]:
+NOTE_MAX = 1200
+
+
+def clean_note(text: str) -> str:
+    """The owner's edited message to the customer: plain text, no control characters, capped."""
+    import unicodedata
+    text = unicodedata.normalize("NFKC", str(text or ""))
+    text = "".join(ch for ch in text if ch in "\n\t" or unicodedata.category(ch)[0] != "C")
+    return text.strip()[:NOTE_MAX]
+
+
+def decide(case_id: str, token: dict[str, str], decision: str, store: Store, actor: str = "owner",
+           note: str | None = None) -> tuple[bool, str]:
     if decision not in ("approve", "block"):
         return False, "unknown decision"
     with _LOCK:
@@ -273,7 +285,10 @@ def decide(case_id: str, token: dict[str, str], decision: str, store: Store, act
         case["status"] = "approved" if decision == "approve" else "blocked"
         case["decision"] = {"by": actor, "at": int(time.time())}
         from . import voice
-        case["customer_note"] = voice.customer_note(case)  # fixed wording only; sent through the store's channel
+        # The owner saw the draft on the decision page and may have edited it. Empty means use the draft.
+        edited = clean_note(note) if note is not None else ""
+        case["customer_note"] = edited or voice.customer_note(case)
+        case["note_edited"] = bool(edited) and edited != voice.customer_note(case)
         store.save_case(case)
     store.append_receipt({"event": case["status"], "case_id": case_id, "message_sha256": sha256(case["text"]),
                           "rules": case["rules"], "models": case["models"], "actor": actor})

@@ -174,16 +174,26 @@ def customer_note(case: dict) -> str:
     act, amt = case.get("requested_action", ""), case.get("amount_usd")
     money = f"${float(amt):,.2f}".replace(".00", "") if amt is not None else ""
     approved = case.get("status") == "approved"
+    # Held by the owner's rules means a yes is an exception, and the customer should know it's a one-time thing.
+    exception = bool(case.get("findings"))
     if act == "refund":
+        if approved and exception:
+            return (f"Hi {name}, I've approved your {money + ' ' if money else ''}refund as a one-time courtesy, since it's "
+                    "outside our usual return policy. It can take 5 to 10 business days to show up, depending on your bank.")
         if approved:
             return (f"Hi {name}, your {money + ' ' if money else ''}refund is on its way. "
                     "It can take 5 to 10 business days to show up, depending on your bank.")
         return (f"Hi {name}, I wish I could take care of this one, but a {money + ' ' if money else ''}refund isn't "
                 "something we can do this time. If you have questions about it, just reply here and we'll talk it through.")
     if act == "reship":
+        if approved and exception:
+            return (f"Hi {name}, I'm sending a replacement as a one-time courtesy, since it's outside our usual policy. "
+                    "You'll get tracking as soon as it ships.")
         return (f"Hi {name}, a replacement is on its way. You'll get tracking as soon as it ships." if approved else
                 f"Hi {name}, we're not able to send a replacement for this order. Reply here if you'd like to talk it through.")
     if act == "cancel":
+        if approved and exception:
+            return f"Hi {name}, I've canceled your order as a one-time courtesy, since it's past our usual cancel window."
         return (f"Hi {name}, your order is canceled." if approved else
                 f"Hi {name}, this order can't be canceled at this point. Reply here and we'll figure out the next step together.")
     if act in ("payment_change", "account_change"):

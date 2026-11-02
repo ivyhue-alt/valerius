@@ -316,3 +316,30 @@ class CustomerHearsBack(unittest.TestCase):
         from valerius import voice
         f = {"rule": "reseller_pattern", "evidence": [{"field": "quantity", "value": "12"}]}
         self.assertEqual(voice.reason(f), "big returns are your call")
+
+
+class OwnerEditsTheNote(Base):
+    def test_exception_approval_says_one_time_courtesy(self):
+        from valerius import voice
+        case = {"channel": "business", "customer_name": "Dana", "requested_action": "refund", "amount_usd": 480,
+                "status": "approved", "findings": [{"rule": "order_over_limit"}]}
+        self.assertIn("one-time courtesy", voice.customer_note(case))
+        self.assertNotIn("courtesy", voice.customer_note(dict(case, findings=[])))
+
+    def test_owner_edit_is_what_gets_sent(self):
+        case = act.open_case(pipeline.run(REFUND), self.store)
+        tok = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(case["link"]).query))
+        ok, _ = act.decide(case["id"], tok, "approve", self.store,
+                           note="Hi Dana, so sorry to hear about your mom. \x07Refund approved, one time.")
+        self.assertTrue(ok)
+        saved = self.store.load_case(case["id"])
+        self.assertTrue(saved["customer_note"].startswith("Hi Dana, so sorry"))
+        self.assertNotIn("\x07", saved["customer_note"])
+        self.assertTrue(saved["note_edited"])
+
+    def test_decision_page_shows_both_drafts(self):
+        case = act.open_case(pipeline.run(REFUND), self.store)
+        tok = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(case["link"]).query))
+        html = page.approval_page(self.store.load_case(case["id"]), tok, act.track_record(self.store))
+        self.assertIn("name=note_yes", html)
+        self.assertIn("name=note_no", html)

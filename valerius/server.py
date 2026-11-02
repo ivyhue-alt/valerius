@@ -254,7 +254,9 @@ class Handler(BaseHTTPRequestHandler):
         form = _flat(parse_qs(raw.decode("utf-8", "replace")))
         m = re.fullmatch(r"/case/([a-f0-9]{12})/decide", u.path)
         if m:
-            ok, info = act.decide(m.group(1), form, form.get("decision", ""), STORE)
+            choice = form.get("decision", "")
+            note = form.get("note_yes" if choice == "approve" else "note_no")
+            ok, info = act.decide(m.group(1), form, choice, STORE, note=note)
             if ok:
                 case = STORE.load_case(m.group(1))
                 return self._send(200, page.receipt_page(case, act.last_receipt(STORE, m.group(1))))
