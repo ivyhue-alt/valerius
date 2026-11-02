@@ -190,7 +190,7 @@ class Server(Base):
         act.open_case(pipeline.run(REFUND), self.store)                                     # a store hold
         status, html = self.get("/owner?" + urllib.parse.urlencode(act.dashboard_token()))
         self.assertEqual(status, 200)
-        self.assertIn("tap to decide", html)
+        self.assertIn("Review and decide", html)
         self.assertNotIn("scam", html.lower().split("<main>")[1])   # the store never sees family alerts
         self.assertEqual(self.get("/owner")[0], 403)
         self.assertEqual(self.get("/owner?" + urllib.parse.urlencode(act.sign("owner", "decide")))[0], 403)
@@ -255,7 +255,7 @@ class OwnerDashboard(unittest.TestCase):
                  {"id": "bbbbbbbbbbbb", "status": "blocked", "risk": "HIGH", "channel": "family", "text": "hi"}]
         html = page.owner_dashboard(cases, {"approved": 1, "blocked": 1}, {"aaaaaaaaaaaa": "http://x/case/aaaaaaaaaaaa?c=1"},
                                     None, False)
-        self.assertIn("tap to decide", html)
+        self.assertIn("Review and decide", html)
         self.assertIn("Over the limit", html)
         self.assertNotIn("<script>x", html)
         self.assertIn("http-equiv=refresh", html)
@@ -279,7 +279,7 @@ class OwnerScreens(unittest.TestCase):
         self.assertIn("If you say yes", html)
         self.assertIn("$480 goes back", html)
         self.assertIn("about $14.22", html)            # 2.9% + $0.30 estimate
-        self.assertIn("1 other claim", html)
+        self.assertIn("2nd claim", html)
         self.assertIn("The two reviews disagree", html)
         self.assertIn("data:image/png;base64,", html)
         self.assertIn("Bank details", html)
