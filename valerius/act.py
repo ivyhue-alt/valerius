@@ -250,6 +250,14 @@ def open_case(result: Result, store: Store, now: int | None = None) -> dict:
     if hold:
         tok = sign(case["id"], "decide")
         case["link"] = link(tok)
+        from . import hours
+        created = case["created_at"]
+        if msg.channel == "business" and not hours.is_open(created):
+            case["after_hours"] = True
+            case["opens_at"] = hours.next_open(created)
+            case["owner_pinged"] = SETTINGS.policy.after_hours != "queue"
+        else:
+            case["owner_pinged"] = True
     store.save_case(case)
     store.append_receipt({"event": case["status"], "case_id": case["id"],
                           "message_sha256": sha256(case["text"]), "rules": case["rules"],
@@ -335,13 +343,37 @@ def family_reply(result: Result) -> str:
     return "I didn't see the usual scam signs. Still, never share a code or send money to someone you haven't checked."
 
 
-def holding_message() -> str:
+def holding_message(case: dict | None = None, now: int | None = None) -> str:
     """What the business agent tells the customer while the owner decides. Never improvised."""
-    return "Thanks for your patience. A team member will confirm this request shortly."
+    from . import hours
+    if case and case.get("after_hours") and case.get("opens_at"):
+        when = hours.when_text(case["opens_at"], now or case.get("created_at", int(time.time())))
+        return f"Got it. We're closed right now, so someone from the team will look at this when we open {when}, and you'll hear back right after."
+    return "Got it. Someone from the team is looking at this now, and you'll hear back shortly."
 
 
 def owner_alert(case: dict) -> str:
-    return f"Valerius held a {case['risk']} request for your review: {case.get('link', '')} (link expires in 2 hours)"
+    from . import voice
+    return f"{voice.opener(case)} {voice.ask(case)} Tap to decide: {case.get('link', '')}"
+
+
+def morning_summary(store: "Store", now: int | None = None) -> str:
+    """One message at opening for everything that came in overnight, instead of a ping per hold."""
+    from . import voice
+    now = now or int(time.time())
+    waiting = [c for c in recent_cases(store, limit=500)
+               if c.get("status") == "held" and c.get("after_hours") and not c.get("owner_pinged")
+               and int(c.get("opens_at", 0)) <= now]
+    if not waiting:
+        return ""
+    for c in waiting:
+        c["owner_pinged"] = True
+        store.save_case(c)
+    lines = [f"- {voice.ask(c)}" for c in waiting[:8]]
+    more = f"\n...and {len(waiting) - 8} more." if len(waiting) > 8 else ""
+    n = len(waiting)
+    return (f"Good morning. {n} thing{'s' if n != 1 else ''} came in overnight and {'are' if n != 1 else 'is'} waiting for you:\n"
+            + "\n".join(lines) + more + "\nOpen your list to decide.")
 
 
 DASHBOARD_TTL_S = 7 * 86400

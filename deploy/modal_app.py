@@ -24,6 +24,7 @@ app = modal.App("valerius")
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .apt_install("ffmpeg")  # turns WhatsApp voice notes (OGG) into the WAV that Transcribe accepts
+    .pip_install("tzdata==2025.2")  # time zones for the store's business hours
     .add_local_dir(REPO / "valerius", "/root/valerius", ignore=["**/__pycache__/**", "**/*.pyc"])
 )
 volume = modal.Volume.from_name("valerius-state", create_if_missing=True)

@@ -36,6 +36,9 @@ font-weight:700;font-size:1.05rem;color:var(--ink)}
 .why{font-size:1.15rem;line-height:1.45;margin:22px 0 8px}
 .note{font-size:.95rem;color:var(--soft);margin:0 0 4px}
 .flag{color:var(--stop);font-weight:600}
+.said{font-size:1.05rem;line-height:1.45;margin:20px 0 0;padding-left:12px;border-left:3px solid var(--line);color:var(--ink)}
+.said small{display:block;color:var(--soft);font-size:.82rem;margin-bottom:2px}
+.late{font-size:.85rem;color:var(--warn);margin:0 0 10px}
 .actions{display:grid;gap:10px;margin:28px 0 8px}
 .btn{display:block;width:100%;font-family:inherit;font-weight:600;font-size:1.08rem;line-height:1.2;padding:17px;border-radius:14px;border:0;cursor:pointer;
 text-align:center}
@@ -270,8 +273,12 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
         head = (f"<div class=who><div class=av>{_initial(case)}</div><div><div class=name>{escape(voice.who(case))}</div>"
                 + (f"<div class=sub>Order {escape(order)}</div>" if order else "") + "</div></div>"
                 + (f"<div class=amount>${float(amt):,.0f}</div>" if amt is not None else "")
-                + f"<div class=sub>{escape(_what(case))}</div>"
-                f"<p class=why>{escape(why)}</p>")
+                + f"<div class=sub>{escape(_what(case))}</div>")
+        said = case.get("text", "").strip()
+        if said:
+            short = said if len(said) <= 240 else said[:237].rsplit(" ", 1)[0] + "..."
+            head += f"<p class=said><small>In their words</small>&ldquo;{_highlight(short, quotes)}&rdquo;</p>"
+        head += f"<p class=why>{escape(why)}</p>"
         if claims:
             head += f"<p class=note><span class=flag>{_ordinal(len(claims) + 1)} claim</span> in two years.</p>"
         if held:
@@ -312,7 +319,7 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
             f"<label for=nn>If you say no</label><textarea id=nn name=note_no rows=5 maxlength=1200 form=decide-form>"
             f"{escape(voice.customer_note(dict(case, status='blocked')))}</textarea></div></details>")
     detail = []
-    if case.get("text", "").strip():
+    if case.get("text", "").strip() and (not business or len(case.get("text", "").strip()) > 240):
         detail.append(f"<div class=label>{'What they wrote' if business else 'The message'}</div>"
                       f"<div class=msg>{_highlight(case.get('text', ''), quotes)}</div>")
     if business and _evidence_image(case):
@@ -344,6 +351,12 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
                          f"<button class='btn no'>{verb}</button></form></div></details>")
     if case.get("paused_agent"):
         head = "<p class='note flag'>Your agent is paused, so everything waits for you.</p>" + head
+    if business and case.get("after_hours"):
+        from . import hours
+        t = hours.local(case.get("created_at", now))
+        at = f"{t.hour % 12 or 12}:{t.minute:02d} {'AM' if t.hour < 12 else 'PM'}"
+        head = (f"<p class=late>Came in at {at}, while you were closed. {escape(voice.who(case))} was told "
+                "you'd look at it when you open.</p>") + head
 
     brand = SETTINGS.policy.business_name if business else "Valerius"
     body = (f"<div class=top><b>{escape(brand)}</b><span>{escape(_ago(case.get('created_at'), now))}</span></div>"
@@ -435,7 +448,8 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
         line = (r[0][:1].upper() + r[0][1:]) if r else "Your rules say you decide this one"
         inner = (f"<div class=av>{_initial(c)}</div><div class=main><div class=name>{escape(voice.who(c))}</div>"
                  f"<div class=line>{escape(_what(c).capitalize())}. {escape(line)}.</div></div>"
-                 f"<div class=right>{f'${float(amt):,.0f}' if amt is not None else ''}<small>{escape(_ago(c.get('created_at')))}</small></div>")
+                 f"<div class=right>{f'${float(amt):,.0f}' if amt is not None else ''}"
+                 f"<small>{'overnight' if c.get('after_hours') else escape(_ago(c.get('created_at')))}</small></div>")
         cls = " class=urgent" if c.get("risk") == "CRITICAL" else ""
         return f"<li{cls}><a href='{escape(link)}' aria-label='Review and decide'>{inner}</a></li>" if link else f"<li{cls}><div class=row>{inner}</div></li>"
 

@@ -207,6 +207,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, page.result_page(f"Already {case['status']}",
                                                         "This review has been decided. A signed receipt was recorded."))
             why = act.check_token(q, case.get("used_nonces", []), purpose="decide")
+            if why == "link has expired":
+                return self._send(403, page.result_page("This link timed out",
+                                  "The request is still waiting for you. Open your list to get a fresh link and decide."))
             if why:
                 return self._send(403, page.result_page("Link not valid", why))
             agent = STORE.agent()

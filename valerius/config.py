@@ -46,6 +46,10 @@ class PolicyCard:
     processor_fee_usd: float = 0.30
     history_days: int = 730                  # how far back Valerius shows a customer's claims (limits use claim_window_days)
     free_cancel_minutes: int = 30            # payment usually settles within this; after it, a cancel costs the business fees
+    timezone: str = "America/New_York"
+    open_hour: int = 9                       # business hours, local time; holds outside them wait for opening
+    close_hour: int = 21
+    after_hours: str = "queue"               # "queue": one summary at opening; "notify": ping the owner anyway
 
     def lines(self) -> list[str]:
         return [
@@ -53,7 +57,14 @@ class PolicyCard:
             f"A customer's claim number {self.max_claims + 1} or more within {self.claim_window_days} days: owner decides.",
             f"Cancel before the payment is taken (or within {self.free_cancel_minutes} minutes if that's unknown) and before shipping: agent may do it, any time of day.",
             "Damage claims without a photo, later cancellations, payment changes and account changes: owner approves.",
+            (f"Outside {self._hour(self.open_hour)} to {self._hour(self.close_hour)}, holds wait quietly and you get one "
+             f"summary when you open." if self.after_hours == "queue" else
+             f"Outside {self._hour(self.open_hour)} to {self._hour(self.close_hour)}, you still get a message right away."),
         ]
+
+    @staticmethod
+    def _hour(h: int) -> str:
+        return f"{h % 12 or 12} {'AM' if h < 12 else 'PM'}"
 
 
 def state_dir() -> Path:
