@@ -218,6 +218,7 @@ def open_case(result: Result, store: Store, now: int | None = None) -> dict:
         "id": uuid.uuid4().hex[:12],
         "created_at": now if now is not None else int(time.time()),
         "customer_id": msg.customer_id,
+        "customer_name": msg.customer_name[:40],
         "items": msg.items,
         "prior_claims": msg.prior_claims,
         "media_read": msg.media_read,
@@ -298,23 +299,23 @@ def track_record(store: Store) -> dict[str, int]:
 def family_reply(result: Result) -> str:
     """Plain-language answer for a person who forwarded something to Valerius Family.
 
-    Built only from fixed wording and the rules' own reasons. Model-written text never goes
+    Built only from fixed wording and the rules' own findings. Model-written text never goes
     into a reply, so a crafted message can't make Valerius send someone a scammer's link."""
-    reasons: list[str] = []
-    for f in result.assessment.findings:
-        if f.reason not in reasons:
-            reasons.append(f.reason)
-    why = "; ".join(reasons[:3]) or "it has signs of a scam"
+    from . import voice
+    found = [{"rule": f.rule, "risk": f.risk.name, "reason": f.reason, "evidence": [asdict(e) for e in f.evidence]}
+             for f in result.assessment.findings]
+    parts = voice.reasons({"findings": found})
+    said = voice.sentences(parts)
     if result.unverified and result.risk < Risk.HIGH:
-        return ("I couldn't fully check this one, so treat it as unsafe for now. Don't send money, codes or "
-                "personal details until someone you trust has looked at it.")
+        return ("I couldn't fully check this one, so treat it as unsafe for now. Hold off on sending money, codes or "
+                "personal details until someone you trust takes a look.")
     if result.risk >= Risk.HIGH:
-        return ("This looks like a scam. Don't send money, gift cards or codes, and don't tap any links. "
-                f"Why: {why}. If it claims to be family, call them on the number you already have. "
-                "You can report scams at reportfraud.ftc.gov.")
+        return ("This looks like a scam. " + (f"{said} " if said else "") +
+                "Don't send money, gift cards or codes, and don't tap any links. If it says it's family, call them "
+                "on the number you already have. You can report it at reportfraud.ftc.gov.")
     if result.risk == Risk.MEDIUM:
-        return f"Be careful with this one. Why: {why}. Check with someone you trust before you act."
-    return "I didn't find common scam signs. Still, never share codes or send money to someone you haven't verified."
+        return "I'd be careful with this one. " + (f"{said} " if said else "") + "Check with someone you trust before you do anything."
+    return "I didn't see the usual scam signs. Still, never share a code or send money to someone you haven't checked."
 
 
 def holding_message() -> str:

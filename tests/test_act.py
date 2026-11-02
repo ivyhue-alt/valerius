@@ -140,7 +140,7 @@ class Page(Base):
         html = page.approval_page(case, act.sign(case["id"], "decide"), act.track_record(self.store), act.agent_token())
         self.assertIn("<mark>", html)
         self.assertIn("Refunds and reships up to $50", html)
-        self.assertIn("Pause agent", html)
+        self.assertIn("Pause my agent", html)
 
 
 class Replies(unittest.TestCase):
@@ -189,7 +189,7 @@ class Server(Base):
         server.handle_incoming(whatsapp.fake_webhook(SCAM), self.store, use_models=False)
         status, html = self.get("/owner?" + urllib.parse.urlencode(act.dashboard_token()))
         self.assertEqual(status, 200)
-        self.assertTrue(">Review<" in html or ">Decide now<" in html)
+        self.assertIn("tap to decide", html)
         self.assertEqual(self.get("/owner")[0], 403)
         self.assertEqual(self.get("/owner?" + urllib.parse.urlencode(act.sign("owner", "decide")))[0], 403)
 
@@ -201,12 +201,12 @@ class Server(Base):
         path = urllib.parse.urlparse(case["link"])
         status, html = self.get(f"{path.path}?{path.query}")
         self.assertEqual(status, 200)
-        self.assertIn("Approve", html)
+        self.assertIn("It&#x27;s a scam", html)
         form = dict(urllib.parse.parse_qsl(path.query))
         form["decision"] = "block"
         status, html = self.post(f"/case/{case['id']}/decide", urllib.parse.urlencode(form).encode())
         self.assertEqual(status, 200)
-        self.assertIn("Blocked", html)
+        self.assertIn("You chose", html)
         status, _ = self.post(f"/case/{case['id']}/decide", urllib.parse.urlencode(form).encode())
         self.assertEqual(status, 403)
 
@@ -253,7 +253,7 @@ class OwnerDashboard(unittest.TestCase):
                  {"id": "bbbbbbbbbbbb", "status": "blocked", "risk": "HIGH", "channel": "family", "text": "hi"}]
         html = page.owner_dashboard(cases, {"approved": 1, "blocked": 1}, {"aaaaaaaaaaaa": "http://x/case/aaaaaaaaaaaa?c=1"},
                                     None, False)
-        self.assertIn(">Review<", html)
+        self.assertIn("tap to decide", html)
         self.assertIn("Over the limit", html)
         self.assertNotIn("<script>x", html)
         self.assertIn("http-equiv=refresh", html)
@@ -274,10 +274,10 @@ class OwnerScreens(unittest.TestCase):
         history = [{"at": 1700000000, "action": "refund", "amount_usd": 40, "status": "approved", "is_claim": True}]
         html = page.approval_page(case, act.sign(case["id"], "decide"), {"held": 1, "approved": 0, "blocked": 0},
                                   history=history)
-        self.assertIn("If you approve", html)
-        self.assertIn("$480.00 goes back", html)
+        self.assertIn("If you say yes", html)
+        self.assertIn("$480 goes back", html)
         self.assertIn("about $14.22", html)            # 2.9% + $0.30 estimate
-        self.assertIn("1 in the last 2 years", html)
+        self.assertIn("1 other claim", html)
         self.assertIn("The two reviews disagree", html)
         self.assertIn("data:image/png;base64,", html)
         self.assertIn("Bank details", html)
@@ -287,9 +287,9 @@ class OwnerScreens(unittest.TestCase):
         case = {"status": "blocked", "requested_action": "refund", "amount_usd": 45, "channel": "business",
                 "order": {"order_id": "ORD-1"}}
         html = page.receipt_page(case, {"seq": 12, "hash": "ab" * 32})
-        self.assertIn("Blocked", html)
-        self.assertIn("No money moves", html)
-        self.assertIn("Receipt number 12", html)
+        self.assertIn("You chose: Don&#x27;t refund", html)
+        self.assertIn("Nothing moves", html)
+        self.assertIn("receipt 12", html)
 
     def test_image_size_headers(self):
         from valerius import media

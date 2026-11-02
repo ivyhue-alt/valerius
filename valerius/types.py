@@ -53,6 +53,7 @@ class Message:
     amount_usd: float | None = None    # business side: amount of the requested action
     order: OrderRecord | None = None
     customer_id: str = ""              # business side: who is asking (a phone number or account id)
+    customer_name: str = ""            # business side: first name from the store's record, for plain wording
     items: list[dict] | None = None    # business side: [{"name", "price_usd", "qty"}] the request covers
     prior_claims: int | None = None    # business side: this customer's refund/reship claims in the window
     media_read: bool = False           # the image or voice note was actually read

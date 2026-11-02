@@ -44,7 +44,7 @@ def serial(store: act.Store, live: bool) -> int:
     now = int(time.time())
     for days_ago, text, amount in SERIAL:
         t = now - days_ago * 86400
-        msg = Message(text=text, channel=Channel.BUSINESS, customer_id="15550002222", requested_action="refund",
+        msg = Message(text=text, channel=Channel.BUSINESS, customer_id="15550002222", customer_name="Dana", requested_action="refund",
                       amount_usd=amount, order=OrderRecord(order_id=f"ORD-{days_ago}", delivered=True,
                                                            receipt_on_file=True, photo_provided=True))
         msg = act.with_history(msg, store, now=t)

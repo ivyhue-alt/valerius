@@ -18,15 +18,15 @@ CSS = """
 @media (prefers-color-scheme:dark){:root{--paper:#0d1322;--tag:#161f36;--ink:#eef1f7;--soft:#bcc4d4;--rule:#2a3550;
 --hold:#f0707a;--hold-bg:#3a1a22;--warn:#f2b45a;--warn-bg:#3a2a12;--clear:#5cc79a;--clear-bg:#12301f;--act:#93a6ff;--mark:#6b5410}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--sans);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.5 var(--sans);-webkit-text-size-adjust:100%}
 main{max-width:600px;margin:0 auto;padding:18px 16px 120px}
 a{color:var(--act);text-underline-offset:3px}
 :focus-visible{outline:3px solid var(--act);outline-offset:2px}
-h1{font:600 1.75rem/1.2 var(--serif);margin:6px 0 6px;letter-spacing:-.01em}
-h2{font:600 1.1rem/1.3 var(--serif);margin:28px 0 10px}
+h1{font:700 1.6rem/1.2 var(--sans);margin:6px 0 6px;letter-spacing:-.01em}
+h2{font:600 1rem/1.3 var(--sans);color:var(--soft);margin:28px 0 10px}
 p{margin:0 0 10px}.soft{color:var(--soft)}.small{font-size:.875rem}
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:.875rem;color:var(--soft)}
-.brand{font:600 1rem var(--serif);color:var(--ink)}
+.brand{font:700 1rem var(--sans);color:var(--ink)}
 .state{display:inline-flex;align-items:center;gap:6px}.state::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--clear)}
 .state.paused::before{background:var(--hold)}
 .chip{display:inline-block;border-radius:6px;padding:1px 8px;font-size:.8rem;font-weight:600}
@@ -46,11 +46,11 @@ ul.dots{margin:0;padding-left:20px}ul.dots li{margin:6px 0}
 .log li{display:flex;gap:10px;align-items:baseline}.log .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .btn{display:inline-block;font:600 1rem var(--sans);padding:13px 18px;border-radius:10px;border:0;cursor:pointer;text-decoration:none;text-align:center}
 .go{background:var(--act);color:#fff}
-@media (prefers-color-scheme:dark){.go{color:#0d1322}}.approve{background:var(--clear);color:#fff}.block{background:var(--hold);color:#fff}
+@media (prefers-color-scheme:dark){.go,.approve,.block,.urgent{color:#0d1322}}.approve{background:var(--clear);color:#fff}.block{background:var(--hold);color:#fff}
 .ghost{background:transparent;color:var(--hold);border:1.5px solid var(--hold)}
 .decide{position:fixed;left:0;right:0;bottom:0;background:var(--tag);border-top:1px solid var(--rule);padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
 .decide .in{max-width:600px;margin:0 auto}.decide .row{display:flex;gap:10px}.decide .btn{flex:1}
-details summary{cursor:pointer;font:600 1.1rem var(--serif);margin:28px 0 10px}
+details summary{cursor:pointer;font:600 1rem var(--sans);color:var(--soft);margin:28px 0 10px}
 textarea,input[type=password],input[type=text]{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid var(--rule);background:var(--tag);color:var(--ink)}
 label{display:block;font-weight:600;margin:18px 0 6px}
 .verdict{border-radius:14px;padding:18px;margin:10px 0 16px}
@@ -69,6 +69,19 @@ label{display:block;font-weight:600;margin:18px 0 6px}
 .tabs{display:flex;gap:6px;margin:14px 0 6px}.tabs a{padding:8px 14px;border-radius:999px;text-decoration:none;color:var(--ink);border:1px solid var(--rule);font-size:.9rem}
 .tabs a.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .urgent{background:var(--hold);color:#fff}
+.thread{display:flex;flex-direction:column;gap:8px;margin:14px 0 0}
+.from{font-size:.8rem;color:var(--soft);margin:6px 0 0 4px}
+.bubble{background:var(--tag);border:1px solid var(--rule);border-radius:20px 20px 20px 6px;padding:11px 15px;max-width:92%;
+font-size:1.05rem;line-height:1.45;align-self:flex-start}
+.bubble.big{font-size:1.2rem;font-weight:600}
+.bubble.photo{padding:4px;overflow:hidden}.bubble.photo .evidence{border:0;border-radius:16px}
+.quoted{align-self:flex-start;max-width:92%;border-left:3px solid var(--rule);padding:4px 0 4px 12px;margin:2px 0 2px 6px;
+color:var(--soft);font-size:.95rem}
+.quoted .quote{color:var(--ink)}
+.bubble.urgent-edge{border-left:4px solid var(--hold)}
+.inbox{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.inbox a.item{display:block;text-decoration:none;color:var(--ink)}
+.when{font-size:.8rem;color:var(--soft);margin:2px 0 0 6px}
 .receipt{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;overflow-wrap:anywhere}
 @media (prefers-reduced-motion:no-preference){.tag.new{animation:in .35s ease-out}@keyframes in{from{transform:translateY(6px);opacity:0}}}
 """
@@ -227,7 +240,9 @@ def _evidence_image(case: dict) -> str:
 def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
                   agent_token: dict[str, str] | None = None, agent_paused: bool = False,
                   history: list[dict] | None = None, now: int | None = None) -> str:
+    """One hold, written like a note from a trusted shift lead, with the decision at the thumb."""
     import time as _time
+    from . import voice
     now = now or int(_time.time())
     quotes: list[str] = []
     for f in case.get("findings", []):
@@ -235,83 +250,53 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
     for mr in case.get("model_reasons", {}).values():
         quotes += mr.get("quotes", [])
     held = case.get("status") == "held"
-    risk = case.get("risk", "")
-    order = case.get("order") or {}
+    amt = case.get("amount_usd")
+    fee = _fee(amt) if amt is not None and case.get("requested_action") in ("refund", "cancel") else None
 
-    # 1. What and how much
-    facts = []
-    if order.get("order_id"):
-        facts.append(("Order", order["order_id"]))
-    if case.get("customer_id"):
-        facts.append(("Customer", case["customer_id"]))
+    bubbles = [f"<div class='bubble big{' urgent-edge' if case.get('risk') == 'CRITICAL' else ''}'>"
+               f"{escape(voice.opener(case))} {escape(voice.ask(case) if case.get('channel') == 'business' else "Someone sent you this, and I think it's a scam.")}</div>"]
+    photo = _evidence_image(case)
+    if photo:
+        bubbles.append(f"<div class='bubble photo'>{photo.split('<p class=')[0]}</div>")
+    if case.get("text", "").strip():
+        who = "They wrote" if case.get("channel") == "business" else "The message says"
+        bubbles.append(f"<div class=quoted>{who}:<div class=quote>{_highlight(case.get('text', ''), quotes)}</div></div>")
+    bubbles.append(f"<div class=bubble>{escape(voice.because(case))}</div>")
     claims = [h for h in (history or []) if h.get("is_claim")]
-    if case.get("channel") == "business" and case.get("customer_id"):
-        facts.append(("Past claims", f"{len(claims)} in the last 2 years"))
-    if order.get("quantity", 1) and int(order.get("quantity", 1)) > 1:
-        facts.append(("Items", str(order["quantity"])))
-    if order.get("payment_captured") is not None:
-        facts.append(("Payment", "taken" if order["payment_captured"] else "only authorized"))
-    facts_html = ("<dl class=facts>" + "".join(f"<dt>{escape(k)}</dt><dd>{escape(str(v))}</dd>" for k, v in facts)
-                  + "</dl>") if facts else ""
-
-    # 2. Why (one line each, record facts inline)
-    reasons = [f for f in case.get("findings", []) if f.get("risk") in ("HIGH", "CRITICAL")] or case.get("findings", [])
-    why = "".join(
-        f"<li>{escape(f['reason'][:1].upper() + f['reason'][1:])}"
-        + "".join(f"<div class=rec>{_evidence_label(e['field'], e['value'])}</div>"
-                  for e in f["evidence"] if e.get("field"))
-        + "</li>" for f in reasons)
-    why += "".join(f"<li>Couldn't check: {escape(g)}</li>" for g in case.get("unverified", []))
-    why = why or "<li class=soft>Held by your rules.</li>"
-
-    # 3. What happens next
-    yes, no = _consequences(case)
-    then = (f"<div class=then><div class=r-clear><b>If you approve</b><span>{escape(yes)}</span></div>"
-            f"<div class=r-hold><b>If you block</b><span>{escape(no)}</span></div></div>")
-
-    # Evidence and history, in place
-    evidence = _evidence_image(case)
-    fields = case.get("image_fields") or {}
-    if fields:
-        from .textnorm import scrub_model_text
-        bits = []
-        if fields.get("says_bank_details_changed"):
-            bits.append("Says the bank or payment details changed")
-        if fields.get("account_last4"):
-            bits.append(f"Pay to account ending {escape(str(fields['account_last4']))}")
-        if fields.get("total_usd") is not None:
-            bits.append(f"Total shown {_money(fields['total_usd'])}")
-        if fields.get("visible_text_summary"):
-            bits.append(escape(scrub_model_text(fields["visible_text_summary"])))
-        if bits:
-            evidence += "<ul class=dots style='margin-top:10px'>" + "".join(f"<li>{b}</li>" for b in bits) + "</ul>"
-    evidence_html = f"<h2>The evidence</h2>{evidence}" if evidence else ""
+    if case.get("channel") == "business" and claims:
+        bubbles.append(f"<div class=bubble>For context, they've made {len(claims)} other claim"
+                       f"{'s' if len(claims) != 1 else ''} in the last two years. It's all under Their history below.</div>")
+    if held:
+        bubbles.append(f"<div class=bubble>If you say yes, {escape(voice.if_yes(case, fee))} "
+                       f"If you say no, {escape(voice.if_no(case))}</div>")
+    if case.get("paused_agent"):
+        bubbles.append("<div class=bubble>Your agent is paused right now, so I'm holding everything it asks for.</div>")
 
     timeline = ""
     if case.get("channel") == "business" and case.get("customer_id"):
         items = "".join(
             f"<li>{escape(_date(h['at']))}: {escape((h['action'] or 'message').replace('_', ' '))}"
             + (f" {_money(h['amount_usd'])}" if h.get("amount_usd") is not None else "")
-            + f", {escape(h['status'])}</li>" for h in (history or [])[-6:])
-        items += f"<li class=now>Today: {escape(_request_lower(case))}, waiting for you</li>" if held else ""
-        timeline = (f"<h2>This customer, last 2 years</h2><div class=sheet><ul class=timeline>{items}</ul>"
-                    f"<p class='small soft' style='margin:6px 0 0'>Your limit: {SETTINGS.policy.max_claims} claims in "
-                    f"{SETTINGS.policy.claim_window_days} days.</p></div>")
+            + f", {escape(h['status'])}</li>" for h in (history or [])[-8:])
+        items += f"<li class=now>Today: {escape(_request_lower(case))}, waiting on you</li>" if held else ""
+        timeline = (f"<details><summary>Their history</summary><div class=sheet><ul class=timeline>{items}</ul>"
+                    f"<p class='small soft' style='margin:6px 0 0'>Your limit is {SETTINGS.policy.max_claims} claims in "
+                    f"{SETTINGS.policy.claim_window_days} days. I keep two years of history.</p></div></details>")
 
-    reviews = _review_line(case)
     model_lines = "".join(
-        f"<li><b>{'Muse Spark' if src == 'muse-spark' else 'Second review (argues the other side)'}</b> "
+        f"<li><b>{'Muse Spark' if src == 'muse-spark' else 'Second check, which argues the other side'}</b> "
         f"{_chip(case.get('models', {}).get(src, ''))}<div class=small>{escape((mr.get('reasons') or [''])[0])}</div></li>"
         for src, mr in case.get("model_reasons", {}).items())
-    reviews_html = (f"<details><summary>Two model reviews</summary><div class=sheet>"
-                    f"<p class=verdict-line>{escape(reviews)}</p><ul class=plain>{model_lines}</ul></div></details>"
-                    if reviews or model_lines else "")
-
-    paused = ("<p class='sheet r-hold'><b>Your agent is paused.</b> Every action it asks for waits for you.</p>"
-              if case.get("paused_agent") else "")
+    rules_fired = "".join(f"<li>{escape(f['rule'].replace('_', ' '))} {_chip(f['risk'])}</li>" for f in case.get("findings", []))
+    how = (f"<details><summary>How I checked</summary><div class=sheet>"
+           f"<p class=verdict-line>{escape(_review_line(case) or 'Your rules held it.')}</p>"
+           f"<ul class=plain>{model_lines}</ul>"
+           + (f"<p class='small soft' style='margin:10px 0 4px'>Rules that fired</p><ul class=dots>{rules_fired}</ul>" if rules_fired else "")
+           + "</div></details>")
 
     decide_bar = ""
     if held:
+        yes, no = voice.buttons(case)
         hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(token.get(k, '')))}'>" for k in TOKEN_KEYS)
         try:
             left = max(0, int(token.get("e", 0)) - now) // 60
@@ -320,34 +305,29 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
         expires = f"{left // 60} h {left % 60} min" if left >= 60 else f"{left} min"
         decide_bar = (f"<form class=decide method=post action='/case/{escape(str(case.get('id', '')))}/decide'>{hidden}"
                       "<div class=in><div class=row>"
-                      "<button class='btn approve' name=decision value=approve>Approve</button>"
-                      "<button class='btn block' name=decision value=block>Block</button></div>"
-                      f"<p class=small style='margin:8px 0 0;text-align:center'><b>This link works once, for {escape(expires)} more.</b> "
-                      "Nothing happens until you choose.</p></div></form>")
+                      f"<button class='btn approve' name=decision value=approve>{escape(yes)}</button>"
+                      f"<button class='btn block' name=decision value=block>{escape(no)}</button></div>"
+                      f"<p class=small style='margin:8px 0 0;text-align:center'>This link works once, for {escape(expires)} more.</p>"
+                      "</div></form>")
 
     switch = ""
     if case.get("channel") == "business" and agent_token:
         hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(agent_token.get(k, '')))}'>" for k in TOKEN_KEYS)
-        verb, path = ("Resume agent", "resume") if agent_paused else ("Pause agent", "pause")
-        switch = (f"<details><summary>Something feels off?</summary><div class=sheet><p class=small>Pausing makes every action "
-                  f"your agent asks for wait for you, until you resume it.</p>"
+        verb, path = ("Resume my agent", "resume") if agent_paused else ("Pause my agent", "pause")
+        switch = (f"<details><summary>Something feels off?</summary><div class=sheet><p class=small>Pause your agent and "
+                  f"I'll hold everything it asks for until you turn it back on.</p>"
                   f"<form method=post action='/agent/{path}'>{hidden}<button class='btn ghost'>{verb}</button></form></div></details>")
     policy = ""
     if case.get("channel") == "business":
         lines = "".join(f"<li>{escape(x)}</li>" for x in SETTINGS.policy.lines())
         policy = f"<details><summary>Your rules</summary><div class=sheet><ul class=dots>{lines}</ul></div></details>"
 
-    state = "Waiting for you" if held else str(case.get("status", "")).capitalize()
-    body = (f"<div class=top><span class=brand>Valerius</span><span>{escape(_ago(case.get('created_at'), now))}</span></div>"
-            f"<div class='tag new'><div>{_chip(risk)} <span class='small soft'>{escape(state)}</span></div>"
-            f"<div class=amt>{escape(_request(case))}</div>{facts_html}"
-            f"<div class=foot><div class=quote>{_highlight(case.get('text', ''), quotes)}</div></div></div>"
-            f"{paused}{evidence_html if case.get('kind') == 'image' else ''}"
-            f"<h2>Why it was held</h2><div class=sheet><ul class=plain>{why}</ul></div>"
-            f"<h2>What happens next</h2>{then}{'' if case.get('kind') == 'image' else evidence_html}"
-            f"{timeline}{reviews_html}{policy}{switch}"
-            "<p class=foot-note>The models advise. Only you decide. Personal details were removed before review.</p>")
-    return _shell("Valerius review", body, decide_bar)
+    name = SETTINGS.policy.business_name if case.get("channel") == "business" else "Valerius"
+    body = (f"<div class=top><span class=brand>{escape(name)}</span><span>{escape(_ago(case.get('created_at'), now))}</span></div>"
+            f"{'<div class=from>From Valerius</div>' if name != 'Valerius' else ''}<div class=thread>{''.join(bubbles)}</div>"
+            f"{timeline}{how}{policy}{switch}"
+            "<p class=foot-note>I check, you decide. Personal details were taken out before anything was reviewed.</p>")
+    return _shell("Valerius", body, decide_bar)
 
 
 def _evidence_label(field: str, value: str) -> str:
@@ -365,23 +345,24 @@ def _request_lower(case: dict) -> str:
 
 
 def receipt_page(case: dict, receipt: dict | None) -> str:
-    """After a decision: a plain receipt the owner can show staff or a customer."""
+    """After a decision: a short note the owner can show staff or a customer."""
     import time as _time
+    from . import voice
     status = str(case.get("status", ""))
-    yes, no = _consequences(case)
-    order = (case.get("order") or {}).get("order_id", "")
-    lines = [f"{_request(case)}" + (f" on order {order}" if order else ""),
-             f"{status.capitalize()} by the owner, {_date(_time.time())}",
-             yes if status == "approved" else no]
-    tone = "r-clear" if status == "approved" else "r-hold"
+    fee = _fee(case["amount_usd"]) if case.get("amount_usd") is not None and case.get("requested_action") in ("refund", "cancel") else None
+    result = voice.if_yes(case, fee) if status == "approved" else voice.if_no(case)
+    result = result[:1].upper() + result[1:]
     proof = ""
     if receipt:
-        proof = (f"<details><summary>Proof</summary><div class=sheet><p class=small>Receipt number {escape(str(receipt.get('seq', '')))} "
-                 f"in a chain where each receipt locks in the one before. Anyone can recheck it with the rules alone.</p>"
+        proof = (f"<details><summary>Proof</summary><div class=sheet><p class=small>This is receipt {escape(str(receipt.get('seq', '')))}. "
+                 f"Each receipt locks in the one before it, so nobody can quietly change the history. "
+                 f"Anyone can recheck it with the rules alone.</p>"
                  f"<p class=receipt>{escape(str(receipt.get('hash', '')))}</p></div></details>")
-    body = (f"<div class=top><span class=brand>Valerius</span><span>Receipt</span></div>"
-            f"<div class='verdict {tone}'><h1 style='margin:0 0 8px'>{escape(status.capitalize())}</h1>"
-            + "".join(f"<p style='margin:0 0 6px;color:var(--ink)'>{escape(x)}</p>" for x in lines) + "</div>"
+    body = (f"<div class=top><span class=brand>Valerius</span><span>{escape(_date(_time.time()))}</span></div>"
+            f"<div class=thread>"
+            f"<div class='bubble big'>Done. {escape(voice.done(case))}</div>"
+            f"<div class=bubble>{escape(result)}</div>"
+            f"<div class=bubble>I saved a receipt, in case anyone asks later.</div></div>"
             f"{proof}<p class=foot-note>You can close this page.</p>")
     return _shell("Valerius receipt", body)
 
@@ -423,73 +404,69 @@ def intake_result(risk: str, held: bool, reply: str, link: str = "") -> str:
 def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dict[str, str],
                     agent_token: dict[str, str] | None, agent_paused: bool, view: str = "waiting",
                     tab_query: str = "", claim_counts: dict[str, int] | None = None) -> str:
-    """The owner's phone view. Waiting holds first; history on its own tab."""
-    from .textnorm import scrub_model_text
-    claim_counts = claim_counts or {}
+    """The owner's phone view: like a text thread from a shift lead. Waiting first; history on its own tab."""
+    from . import voice
 
-    def reason(c: dict) -> str:
-        r = (c.get("findings") or [{}])[0].get("reason", "") or ("couldn't check everything" if c.get("unverified") else "")
-        return r[:1].upper() + r[1:]
-
-    def tag(c: dict) -> str:
+    def note(c: dict) -> str:
+        if c.get("channel") == "business":
+            first = voice.ask(c)
+        else:
+            first = "Someone sent a message that looks like a scam."
+        r = voice.reasons(c, limit=1)
+        line = f"{first} {r[0][:1].upper() + r[0][1:]}." if r else first
         link = review_links.get(c.get("id", ""))
         urgent = c.get("risk") == "CRITICAL"
-        go = (f"<a class='btn {'urgent' if urgent else 'go'}' href='{escape(link)}'>{'Decide now' if urgent else 'Review'}</a>"
-              if link else "")
-        who = []
-        if (c.get("order") or {}).get("order_id"):
-            who.append(f"Order {c['order']['order_id']}")
-        if c.get("customer_id"):
-            n = claim_counts.get(c["customer_id"], 0)
-            who.append(f"{n} earlier claim{'s' if n != 1 else ''}" if c.get("is_claim") else "")
-        who_txt = ", ".join(w for w in who if w)
-        return (f"<li class=tag><div>{_chip(c.get('risk', ''))} <span class='small soft'>{escape(_ago(c.get('created_at')))}</span></div>"
-                f"<div class=amt>{escape(_request(c))}</div>"
-                + (f"<div class='small soft'>{escape(who_txt)}</div>" if who_txt else "")
-                + f"<div class=foot><span style='flex:1;min-width:0'>{escape(reason(c))}</span>{go}</div></li>")
+        inner = (f"<div class='bubble{' urgent-edge' if urgent else ''}' style='max-width:100%'>"
+                 f"{'<b>Needs you now.</b> ' if urgent else ''}{escape(line)}</div>"
+                 f"<div class=when>{escape(_ago(c.get('created_at')))}{', tap to decide' if link else ''}</div>")
+        return f"<li><a class=item href='{escape(link)}'>{inner}</a></li>" if link else f"<li>{inner}</li>"
 
-    def logrow(c: dict) -> str:
-        outcome = {"approved": "Approved", "blocked": "Blocked", "allowed": "Passed"}.get(str(c.get("status")), str(c.get("status")))
-        tone = {"Blocked": "r-hold", "Approved": "r-clear", "Passed": "r-clear"}.get(outcome, "r-warn")
-        order = (c.get("order") or {}).get("order_id", "")
-        return (f"<li><div><span class='chip {tone}'>{escape(outcome)}</span> <b>{escape(_request(c))}</b>"
-                + (f" <span class='small soft'>order {escape(order)}</span>" if order else "")
-                + f" <span class='small soft'>{escape(_ago(c.get('created_at')))}</span></div>"
-                f"<div class='small soft'>{escape(scrub_model_text(str(c.get('text', '')))[:160])}</div></li>")
+    def past(c: dict) -> str:
+        status = str(c.get("status"))
+        if status == "allowed":
+            text = f"{voice.ask(c)[:-1] if c.get('channel') == 'business' else 'A message came in'}, and it was within your rules, so your agent handled it."
+            if c.get("channel") == "business" and not c.get("requested_action"):
+                text = "A customer asked a question, and your agent handled it."
+        else:
+            yes, no = voice.buttons(c)
+            said = yes if status == "approved" else no
+            text = f"{voice.ask(c) if c.get('channel') == 'business' else 'A possible scam came in.'} You chose: {said}."
+        return f"<li><div class=bubble style='max-width:100%'>{escape(text)}</div><div class=when>{escape(_ago(c.get('created_at')))}</div></li>"
 
     waiting = sorted([c for c in cases if c.get("status") == "held"],
                      key=lambda c: (c.get("risk") != "CRITICAL", -int(c.get("created_at", 0))))
     done = [c for c in cases if c.get("status") != "held"][:30]
     n = len(waiting)
-    headline = ("Nothing needs you right now" if n == 0 else
-                "1 decision is waiting for you" if n == 1 else f"{n} decisions are waiting for you")
+    words = ["Nothing", "One thing", "Two things", "Three things", "Four things", "Five things", "Six things",
+             "Seven things", "Eight things", "Nine things"]
+    headline = "Nothing needs you right now." if n == 0 else f"{words[n] if n < 10 else str(n) + ' things'} need{'s' if n == 1 else ''} you."
     q = escape(tab_query)
-    tabs = (f"<nav class=tabs><a class='{'on' if view != 'history' else ''}' href='/owner?{q}'>Waiting ({n})</a>"
-            f"<a class='{'on' if view == 'history' else ''}' href='/owner?{q}&amp;view=history'>History</a></nav>")
+    tabs = (f"<nav class=tabs><a class='{'on' if view != 'history' else ''}' href='/owner?{q}'>Needs you ({n})</a>"
+            f"<a class='{'on' if view == 'history' else ''}' href='/owner?{q}&amp;view=history'>Earlier</a></nav>")
     if view == "history":
-        main_html = (f"<div class=sheet><ul class=plain>{''.join(logrow(c) for c in done)}</ul></div>" if done else
-                     "<p class=soft>Nothing handled yet.</p>")
+        main_html = (f"<ul class=inbox>{''.join(past(c) for c in done)}</ul>" if done else
+                     "<p class=soft>Nothing has come through yet.</p>")
     else:
-        main_html = (f"<ul class=tags>{''.join(tag(c) for c in waiting)}</ul>" if waiting else
-                     "<p class=soft>Your agent is handling everything within your rules. New holds show up here.</p>")
+        main_html = (f"<ul class=inbox>{''.join(note(c) for c in waiting)}</ul>" if waiting else
+                     "<div class=thread><div class=bubble>All quiet. Your agent is handling things within your rules, "
+                     "and I'll put anything that needs you right here.</div></div>")
 
     switch = ""
     if agent_token:
         hidden = "".join(f"<input type=hidden name='{k}' value='{escape(str(agent_token.get(k, '')))}'>" for k in TOKEN_KEYS)
-        verb, path = ("Resume agent", "resume") if agent_paused else ("Pause agent", "pause")
-        switch = (f"<details><summary>Something feels off?</summary><div class=sheet><p class=small>Pausing makes every action "
-                  f"your agent asks for wait for you, until you resume it.</p>"
+        verb, path = ("Resume my agent", "resume") if agent_paused else ("Pause my agent", "pause")
+        switch = (f"<details><summary>Something feels off?</summary><div class=sheet><p class=small>Pause your agent and "
+                  f"I'll hold everything it asks for until you turn it back on.</p>"
                   f"<form method=post action='/agent/{path}'>{hidden}<button class='btn ghost'>{verb}</button></form></div></details>")
     rules = "".join(f"<li>{escape(x)}</li>" for x in SETTINGS.policy.lines())
     state = ("<span class='state paused'>Agent paused</span>" if agent_paused else
-             "<span class=state>Agent acting within your rules</span>")
+             "<span class=state>Agent on, within your rules</span>")
+    so_far = f"You've said yes {record.get('approved', 0)} times and no {record.get('blocked', 0)} times so far."
     body = (f"<div class=top><span class=brand>{escape(SETTINGS.policy.business_name)}</span>{state}</div>"
-            f"<h1>{escape(headline)}</h1>"
-            f"<p class='small soft'>So far: {record.get('approved', 0)} approved, {record.get('blocked', 0)} blocked.</p>"
+            f"<h1>{escape(headline)}</h1><p class='small soft'>{escape(so_far)}</p>"
             f"{tabs}{main_html}{switch}"
             f"<details><summary>Your rules</summary><div class=sheet><ul class=dots>{rules}</ul></div></details>"
-            "<p class=foot-note>This page refreshes every 30 seconds and only shows. "
-            "You decide on each case's own page, with a link that works once.</p>")
+            "<p class=foot-note>This page refreshes every 30 seconds. Tap a note to decide.</p>")
     html = _shell("Valerius", body)
     return html.replace("<meta name=robots content=noindex>",
                         "<meta name=robots content=noindex><meta http-equiv=refresh content=30>"
