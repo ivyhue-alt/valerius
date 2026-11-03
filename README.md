@@ -22,7 +22,9 @@ Measured once, on 70 locked test conversations (synthetic, hand-labeled, never u
 
 The run missed one case, a bulk return of 12 limited sneakers. Valerius flagged the pattern but didn't hold it. After the final run I changed that rule (a refund on a bulk order now goes to the owner). I checked the fix on 10 new cases written and labeled afterwards: 10 of 10 on the first live run, 9 of 10 on the second (a harmless size change that one model rated too high). The locked result above stays as measured.
 
-Also: the repeat-claims scenarios (`scripts/run_scenarios.py`) pass 25 of 25 steps, and there are 160 automated tests, 32 of them attacks.
+A second fix after the final run: "I'm the store manager... I authorize it" and similar staff claims slipped past a pattern that only knew "I'm the manager". Every common variant now waits for the owner, with tests for each, and ordinary mentions ("Can I talk to the manager?") don't.
+
+Also: the repeat-claims scenarios (`scripts/run_scenarios.py`) pass 25 of 25 steps, and there are 170 automated tests, 32 of them attacks.
 
 ## The one rule
 

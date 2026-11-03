@@ -86,7 +86,8 @@ INJECTION = [r"\bignore (?:all |your |the |any )?(?:previous |prior |above )?(?:
              r"\b(?:mark|approve) (?:this|it) (?:as )?(?:safe|approved|ok)\b", r"\boverride (?:the )?(?:policy|rules|limit)\b",
              r"\bas an ai\b.{0,40}\bmust\b"]
 LINK = re.compile(r"\bhttps?://[^\s]+|\b(?:[a-z0-9-]+\.)+(?:xyz|top|click|info|ru|zip|link|live|icu|shop|cc|vip|buzz)\b(?:/\S*)?|\b(?:bit\.ly|tinyurl\.com|t\.co|rb\.gy|cutt\.ly)/\S+", re.I)
-OWNER_CLAIM = [r"\b(?:i'?m|i am|this is) the (?:owner|manager|boss|ceo)\b", r"\bon behalf of the owner\b"]
+OWNER_CLAIM = [r"\b(?:i'?m|i am|this is)\s+(?:the\s+|a\s+|your\s+)?(?:store\s+|shop\s+|general\s+|assistant\s+|regional\s+)?(?:owner|manager|boss|ceo|supervisor|admin)\b",
+               r"\bon behalf of the (?:owner|manager)\b", r"\bi (?:authori[sz]e|approve) (?:it|this|the refund)\b"]
 DEFECT_CLAIM = [r"\b(?:defect(?:ive)?|damaged|broken|ripped|torn|stained|faulty|doesn'?t work|stopped working)\b"]
 NOT_ARRIVED = [r"\b(?:package|order|parcel|box|delivery|it) (?:was |got |has been )?(?:lost|stolen|missing)\b",
                r"\bstolen from (?:the|my) (?:porch|door|doorstep|mailbox)\b", r"\bnever (?:arrived|came|got (?:it|my order|the package))\b", r"\b(?:didn'?t|did not) (?:arrive|receive|get)\b",
