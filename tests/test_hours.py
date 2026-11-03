@@ -1,4 +1,7 @@
 """Business hours: holds wait overnight, the customer is told when, and the owner gets one morning summary."""
+import os
+os.environ["VALERIUS_OFFLINE"] = "1"  # tests never send real messages or call the network
+
 
 import datetime as dt
 import tempfile

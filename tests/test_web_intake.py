@@ -1,4 +1,7 @@
 """The web intake page: same loop as WhatsApp, guarded by an access code."""
+import os
+os.environ["VALERIUS_OFFLINE"] = "1"  # tests never send real messages or call the network
+
 
 import unittest
 import urllib.error

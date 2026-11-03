@@ -1,4 +1,7 @@
 """Insights come only from recorded cases."""
+import os
+os.environ["VALERIUS_OFFLINE"] = "1"  # tests never send real messages or call the network
+
 
 import time
 import unittest

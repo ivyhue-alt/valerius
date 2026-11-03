@@ -96,7 +96,8 @@ def download_media(media_id: str, max_bytes: int = 16_000_000) -> tuple[bytes, s
 
     from .config import SETTINGS
 
-    if not (SETTINGS.whatsapp_token and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", media_id or "")):
+    import os
+    if os.environ.get("VALERIUS_OFFLINE") or not (SETTINGS.whatsapp_token and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", media_id or "")):
         return b"", "", "no token or bad media id"
     auth = {"Authorization": f"Bearer {SETTINGS.whatsapp_token}"}
     try:
@@ -125,8 +126,9 @@ def send_text(to: str, body: str) -> dict[str, Any]:
 
     from .config import SETTINGS, state_dir
 
+    import os
     payload = {"messaging_product": "whatsapp", "to": to, "type": "text", "text": {"preview_url": False, "body": body[:4000]}}
-    if not (SETTINGS.whatsapp_token and SETTINGS.whatsapp_phone_number_id):
+    if os.environ.get("VALERIUS_OFFLINE") or not (SETTINGS.whatsapp_token and SETTINGS.whatsapp_phone_number_id):
         out = state_dir() / "outbox.jsonl"
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("a", encoding="utf-8") as fh:

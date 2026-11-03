@@ -1,4 +1,7 @@
 """Model stages, tested with fake model replies (no keys, no network)."""
+import os
+os.environ["VALERIUS_OFFLINE"] = "1"  # tests never send real messages or call the network
+
 
 import json
 import unittest

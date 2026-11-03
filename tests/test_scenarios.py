@@ -1,3 +1,6 @@
+import os
+os.environ["VALERIUS_OFFLINE"] = "1"  # tests never send real messages or call the network
+
 import contextlib
 import io
 import sys
