@@ -86,6 +86,9 @@ def join(parts: list[str]) -> str:
 
 def reasons(case: dict, limit: int = 3) -> list[str]:
     strong = [f for f in case.get("findings", []) if f.get("risk") in ("HIGH", "CRITICAL")] or case.get("findings", [])
+    rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+    first = {"owner_impersonation": 0}            # someone posing as the owner matters more than the amount
+    strong = sorted(strong, key=lambda f: (rank.get(f.get("risk", "LOW"), 3), first.get(f.get("rule", ""), 1)))
     out = []
     for f in strong:
         line = reason(f)

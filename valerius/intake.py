@@ -39,7 +39,8 @@ def sniff(data: bytes) -> tuple[str, str]:
     return "", ""
 
 
-def parse_form(body: bytes, content_type: str) -> dict[str, bytes]:
+def parse_form(body: bytes, content_type: str,
+               fields: tuple[str, ...] = ("code", "text", "file")) -> dict[str, bytes]:
     """Parse a multipart/form-data body into {field: bytes}. Unknown fields are dropped."""
     if not content_type.lower().startswith("multipart/form-data"):
         return {}
@@ -53,7 +54,7 @@ def parse_form(body: bytes, content_type: str) -> dict[str, bytes]:
         return out
     for part in msg.iter_parts():
         name = part.get_param("name", header="content-disposition")
-        if name in ("code", "text", "file") and name not in out:
+        if name in fields and name not in out:
             out[name] = part.get_payload(decode=True) or b""
     return out
 
@@ -61,3 +62,16 @@ def parse_form(body: bytes, content_type: str) -> dict[str, bytes]:
 def code_ok(given: str) -> bool:
     expected = SETTINGS.intake_code
     return bool(expected) and hmac.compare_digest(given.encode(), expected.encode())
+
+
+SHOP_FIELDS = ("code", "name", "order", "amount", "text", "file")
+
+
+def money(raw: str) -> float | None:
+    """'$1,200.50' -> 1200.5. Anything that isn't a sensible amount -> None."""
+    t = raw.replace("$", "").replace(",", "").strip()
+    try:
+        v = round(float(t), 2)
+    except ValueError:
+        return None
+    return v if 0 < v <= 100_000 else None

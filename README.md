@@ -83,6 +83,11 @@ The WhatsApp webhook is built and tested against Meta's webhook format, with sig
 
 The owner can also pause the agent: every action it asks for is then held until they resume it.
 
+**Store help page (`/help`).** A store's customer can ask for help from their phone: first name, order number, what
+happened, the refund they want and an optional photo. It goes through the same loop as the agent's tool calls. The
+customer sees the store's fixed reply right away, and their page updates on its own when the owner decides on their
+dashboard. For the demo it sits behind the same access code as `/check`.
+
 When someone poses as the owner or staff, and the owner has turned the option on, the page offers a third choice:
 deny and block them. A blocked person's refunds, replacements and account changes are refused from then on without
 asking the owner again; their questions still get answered, and they aren't told they're blocked. The dashboard lists

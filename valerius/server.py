@@ -29,7 +29,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import act, intake, page, pipeline, whatsapp
 from .config import SETTINGS
-from .types import Channel, Message, Risk
+from .types import Channel, Message, OrderRecord, Risk
 
 STORE = act.Store()
 MAX_BODY = 1_000_000
@@ -138,6 +138,34 @@ def handle_check(text: str, data: bytes, store: act.Store = STORE, live: bool | 
     return 200, page.intake_result(result.risk.name, case["status"] == "held", act.family_reply(result), case.get("link", ""))
 
 
+def handle_shop(form: dict[str, bytes], store: act.Store = STORE, live: bool | None = None) -> tuple[int, str]:
+    """A store customer asks for help from their phone. Same loop as the agent's tool calls: rules, two model
+    reviews, hold for the owner if risky. The customer gets the store's fixed wording and a page that updates."""
+    live = SETTINGS.server_live if live is None else live
+    get = lambda k: form.get(k, b"").decode("utf-8", "replace").strip()
+    name, order, text = get("name")[:40], get("order")[:24], get("text")[:intake.MAX_TEXT]
+    amount = intake.money(get("amount")) if get("amount") else None
+    data = form.get("file", b"")
+    kind, mime = ("text", "")
+    if data:
+        kind, mime = intake.sniff(data)
+        if kind != "image":
+            return 400, page.shop_form("Add a photo as a JPEG, PNG or WEBP image.")
+    if not name or not text:
+        return 400, page.shop_form("Add your first name and tell us what happened.")
+    if get("amount") and amount is None:
+        return 400, page.shop_form("Check the amount. Use numbers only, like 24 or 24.50.")
+    # One id per person per store, from what they gave this store. Never shared with other stores.
+    cid = "web-" + hashlib.sha256(f"{name.lower()}|{order.upper()}".encode()).hexdigest()[:10]
+    msg = Message(text=text, channel=Channel.BUSINESS, kind=kind, sender="web", requested_action="refund" if amount else "",
+                  amount_usd=amount, customer_id=cid, customer_name=name.split()[0].title(),
+                  order=OrderRecord(order_id=order.upper(), delivered=True, photo_provided=bool(data)))
+    result = pipeline.run(msg, use_models=live, media=data or None, media_mime=mime)
+    case = act.open_case(result, store)
+    sys.stderr.write(f"case {case['id']}: {case['risk']} {case['status']} kind={kind} via=shop\n")
+    return 200, page.shop_status(case, act.sign(case["id"], "status", ttl_s=7 * 86400), act.holding_message(case))
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "Valerius"
 
@@ -181,6 +209,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, "ok", "text/plain")
         if u.path == "/check" and SETTINGS.intake_code:
             return self._send(200, page.intake_form())
+        if u.path == "/help" and SETTINGS.intake_code:
+            return self._send(200, page.shop_form())
+        m = re.fullmatch(r"/status/([a-f0-9]{12})", u.path)
+        if m:
+            case = STORE.load_case(m.group(1))
+            why = act.check_token(q, [], purpose="status", check_used=False)
+            if why or not case or q.get("c") != m.group(1):
+                return self._send(403, page.result_page("Link not valid", "This status link isn't valid."))
+            return self._send(200, page.shop_status(case, {k: q.get(k, "") for k in act_keys()}, act.holding_message(case)))
         if u.path == "/owner":
             if not act.dashboard_ok(q):
                 return self._send(403, page.result_page("Link not valid", "This dashboard link is not valid or has expired."))
@@ -245,6 +282,16 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         if u.path == "/check" and SETTINGS.intake_code:
             return self._check()
+        if u.path == "/help" and SETTINGS.intake_code:
+            raw = self._body(intake.MAX_UPLOAD)
+            if raw is None:
+                return self._send(413, page.shop_form("That photo is too large (12 MB at most)."))
+            if not _allowed("web"):
+                return self._send(429, page.shop_form("Too many requests right now. Try again in a minute."))
+            form = intake.parse_form(raw, self.headers.get("Content-Type", ""), intake.SHOP_FIELDS)
+            if not intake.code_ok(form.get("code", b"").decode("utf-8", "replace")):
+                return self._send(403, page.shop_form("That access code isn't right."))
+            return self._send(*handle_shop(form, STORE))
         raw = self._body()
         if raw is None:
             return self._send(413, "too large", "text/plain")

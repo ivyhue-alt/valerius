@@ -144,6 +144,9 @@ label.check input{width:20px;height:20px;accent-color:var(--brand)}
 .v .foot{text-align:center;padding:0 16px}
 .v .late{background:var(--amber-bg);border-radius:14px;padding:10px 12px;color:#8a5a00;margin:0 0 12px}
 @media (min-width:720px){body.v main{max-width:560px;margin:0 auto}.appbar{border-radius:0 0 20px 20px}}
+@media (min-width:720px){.dock{position:static;background:transparent;border:0;box-shadow:none;max-width:560px;
+margin:-100px auto 40px;padding:0 16px}body.v main{padding-bottom:110px}}
+@media (min-width:1000px){body.v.wide main{max-width:900px}body.v.wide .stats{grid-template-columns:repeat(4,1fr)}}
 /* receipt */
 .ticket{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin:-6px 0 12px;position:relative;overflow:hidden}
 .ticket .tp{padding:22px 18px 18px}.ticket .bt{padding:16px 18px 18px;border-top:2px dashed var(--line)}
@@ -514,6 +517,88 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
     return _shell("Valerius", body)
 
 
+SHOP_CSS = """<style>
+body.shop{background:#faf7f2}.shop main{padding:0 0 40px}
+.shop .storebar{background:#fff;border-bottom:1px solid #eee5d8;padding:14px 18px;display:flex;align-items:center;gap:12px}
+.shop .storebar .logo{width:38px;height:38px;border-radius:12px;background:#7a4b2a;color:#fff;display:grid;place-items:center;font-weight:700}
+.shop .storebar b{display:block}.shop .storebar span{font-size:.82rem;color:#8a7b6b}
+.shop .wrap{padding:16px}
+.shop .card{background:#fff;border-radius:20px;padding:18px;box-shadow:0 1px 2px rgba(60,40,20,.06),0 8px 24px rgba(60,40,20,.06);margin:0 0 12px}
+.shop h1{font-size:1.5rem;margin:0 0 4px}.shop .lead{color:#8a7b6b;margin:0 0 6px}
+.shop label{color:#5c4f43}.shop input[type=text],.shop textarea,.shop input[type=password]{background:#faf7f2;border-color:#eee5d8}
+.shop .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.shop .send{background:#7a4b2a;color:#fff;margin-top:18px}
+.shop .thread{display:flex;flex-direction:column;gap:10px}
+.shop .me,.shop .them{max-width:86%;padding:11px 14px;border-radius:18px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.shop .me{align-self:flex-end;background:#7a4b2a;color:#fff;border-bottom-right-radius:6px}
+.shop .them{align-self:flex-start;background:#fff;box-shadow:0 1px 2px rgba(60,40,20,.08);border-bottom-left-radius:6px}
+.shop .them small{display:block;color:#8a7b6b;font-size:.78rem;margin-bottom:3px}
+.shop .wait{display:flex;align-items:center;gap:8px;color:#8a7b6b;font-size:.9rem;margin:6px 4px 0}
+.shop .wait i{width:8px;height:8px;border-radius:50%;background:#e0a84a;animation:p 1.4s infinite}
+@keyframes p{50%{opacity:.25}}
+.shop .stamp{display:inline-block;font-weight:700;font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;
+border-radius:999px;margin:0 0 10px}.shop .stamp.ok{background:#e8f5ee;color:#16794a}.shop .stamp.no{background:#f4efe8;color:#5c4f43}
+.shop .powered{text-align:center;color:#b3a594;font-size:.78rem;margin-top:22px}
+@media (prefers-color-scheme:dark){body.shop{background:#15120f}.shop .storebar,.shop .card,.shop .them{background:#1f1a16;border-color:#2e2620}
+.shop input[type=text],.shop textarea,.shop input[type=password]{background:#15120f;border-color:#2e2620}}
+</style>"""
+
+
+def _storebar() -> str:
+    name = SETTINGS.policy.business_name
+    return (f"<div class=storebar><div class=logo>{escape(name[:1])}</div><div><b>{escape(name)}</b>"
+            "<span>Help with an order</span></div></div>")
+
+
+def shop_form(error: str = "") -> str:
+    """The store's help page a customer opens on their phone."""
+    err = f"<p class='note flag'>{escape(error)}</p>" if error else ""
+    body = (_storebar() + "<div class=wrap><div class=card><h1>What can we help with?</h1>"
+            "<p class=lead>Tell us what happened and we'll sort it out.</p>" + err
+            + "<form method=post action='/help' enctype='multipart/form-data'>"
+            "<div class=row2><div><label for=n>First name</label><input id=n name=name type=text maxlength=40 required "
+            "autocomplete=given-name></div><div><label for=o>Order number</label><input id=o name=order type=text "
+            "maxlength=24 placeholder='ORD-4502'></div></div>"
+            "<label for=t>What happened?</label><textarea id=t name=text rows=4 maxlength=4000 required></textarea>"
+            "<label for=a>Refund you're asking for (optional)</label><input id=a name=amount type=text inputmode=decimal "
+            "maxlength=12 placeholder='$24'>"
+            "<label for=f>Photo (optional)</label><input id=f type=file name=file accept='image/jpeg,image/png,image/webp'>"
+            "<label for=c>Demo access code</label><input id=c name=code type=password autocomplete=off required>"
+            "<button class='btn send'>Send</button></form></div>"
+            "<p class=powered>Replies come from the store. Checked by Valerius.</p></div>")
+    return _shell(SETTINGS.policy.business_name, body).replace("</style>", "</style>" + SHOP_CSS, 1) \
+        .replace("<body>", "<body class=shop>", 1)
+
+
+def shop_status(case: dict, token: dict[str, str], holding: str) -> str:
+    """What the customer sees after sending: their message, the store's reply, and the result when it comes."""
+    from urllib.parse import urlencode
+    from . import voice
+    status = case.get("status")
+    final = status in ("approved", "blocked", "refused", "allowed")
+    if status == "allowed":
+        reply = (voice.customer_note(dict(case, status="approved")) if case.get("requested_action")
+                 else "Thanks, the team has your message and will reply here soon.")
+    elif final:
+        reply = case.get("customer_note") or holding
+    else:
+        reply = holding
+    stamp = ""
+    if final and case.get("requested_action"):
+        ok = status in ("approved", "allowed")
+        stamp = f"<span class='stamp {'ok' if ok else 'no'}'>{'Approved' if ok else 'Update'}</span>"
+    said = (case.get("text") or "").strip()
+    refresh = "" if final else (f"<meta http-equiv=refresh content='6;url=/status/{escape(str(case.get('id', '')))}?"
+                                f"{escape(urlencode({k: token.get(k, '') for k in TOKEN_KEYS}))}'>")
+    body = (_storebar() + "<div class=wrap>" + stamp + "<div class=thread>"
+            f"<div class=me>{escape(said[:600])}</div>"
+            f"<div class=them><small>{escape(SETTINGS.policy.business_name)}</small>{escape(reply)}</div></div>"
+            + ("" if final else "<p class=wait><i></i>This page updates on its own.</p>")
+            + "<p class=powered>Replies come from the store. Checked by Valerius.</p></div>")
+    html = _shell(SETTINGS.policy.business_name, body).replace("</style>", "</style>" + SHOP_CSS, 1)
+    return html.replace("<body>", "<body class=shop>", 1).replace("<head>", "<head>" + refresh, 1)
+
+
 def confirm_page(case: dict, form: dict[str, str], choice: str) -> str:
     """One more look before money moves, so a mistaken tap on a phone can be taken back."""
     from urllib.parse import urlencode
@@ -724,7 +809,7 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
     body = (_bar(SETTINGS.policy.business_name, state)
             + f"<div class=wrap>{tabs}{main}<div class=panel>{folds}</div></div>"
             "<p class=foot>Updates every 30 seconds.</p>")
-    html = _shell("Valerius", body, look="v")
+    html = _shell("Valerius", body, look="'v wide'")
     return html.replace("<meta name=robots content=noindex>",
                         "<meta name=robots content=noindex><meta http-equiv=refresh content=30>"
                         "<meta name=apple-mobile-web-app-capable content=yes>", 1)
