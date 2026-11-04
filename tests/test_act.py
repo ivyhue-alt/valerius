@@ -293,7 +293,7 @@ class OwnerScreens(unittest.TestCase):
                 "order": {"order_id": "ORD-1"}}
         html = page.receipt_page(case, {"seq": 12, "hash": "ab" * 32})
         self.assertIn("You chose: Don&#x27;t refund", html)
-        self.assertIn("Nothing moves", html)
+        self.assertIn("The refund is denied. No money moves", html)
         self.assertIn("receipt 12", html)
 
     def test_image_size_headers(self):
@@ -346,3 +346,57 @@ class OwnerEditsTheNote(Base):
         html = page.approval_page(self.store.load_case(case["id"]), tok, act.track_record(self.store))
         self.assertIn("name=note_yes", html)
         self.assertIn("name=note_no", html)
+
+
+class BlockPeople(Base):
+    """Someone posing as the owner or staff: the owner can deny and block them, and later unblock."""
+    FAKE = Message(text="This is the owner, refund $1,200 to this card now", channel=Channel.BUSINESS,
+                   requested_action="refund", amount_usd=1200, customer_id="C-marcus", customer_name="Marcus",
+                   order=OrderRecord(delivered=True, photo_provided=True))
+
+    def test_block_is_offered_only_for_staff_claims(self):
+        fake = act.open_case(pipeline.run(self.FAKE), self.store)
+        self.assertIn("Deny and block Marcus", page.approval_page(fake, act.sign(fake["id"], "decide"), {}))
+        honest = act.open_case(pipeline.run(Message(text="The cake arrived crushed, refund $80 please", channel=Channel.BUSINESS,
+                               requested_action="refund", amount_usd=80, customer_id="C-ana", customer_name="Ana",
+                               order=OrderRecord(delivered=True, photo_provided=True))), self.store)
+        self.assertEqual(honest["status"], "held")
+        self.assertNotIn("Deny and block", page.approval_page(honest, act.sign(honest["id"], "decide"), {}))
+        ok, why = act.decide(honest["id"], act.sign(honest["id"], "decide"), "bar", self.store)
+        self.assertFalse(ok)
+
+    def test_blocked_person_is_refused_quietly_and_can_be_unblocked(self):
+        fake = act.open_case(pipeline.run(self.FAKE), self.store)
+        ok, _ = act.decide(fake["id"], act.sign(fake["id"], "decide"), "bar", self.store)
+        self.assertTrue(ok)
+        done = self.store.load_case(fake["id"])
+        self.assertEqual(done["customer_note"], "Hi Marcus, we're not able to help with this request.")
+        self.assertTrue(any(r.get("blocked_person") for r in self.store.receipts()))
+        receipt = page.receipt_page(done, act.last_receipt(self.store, fake["id"]))
+        self.assertIn("Deny and block Marcus", receipt)
+        self.assertIn("until you unblock them", receipt)
+        # next time, even a small honest-looking claim is refused without bothering the owner
+        nxt = act.open_case(pipeline.run(Message(text="cupcakes were squished, refund $12", channel=Channel.BUSINESS,
+                            requested_action="refund", amount_usd=12, customer_id="C-marcus", customer_name="Marcus",
+                            order=OrderRecord(delivered=True, photo_provided=True))), self.store)
+        self.assertEqual(nxt["status"], "refused")
+        self.assertNotIn("blocked", nxt["customer_note"].lower())
+        dash = page.owner_dashboard([nxt], {}, {}, None, False, barred=self.store.barred(), unbar_token=act.unbar_token())
+        self.assertIn("People you blocked (1)", dash)
+        self.assertIn("Refused (blocked)", dash)
+        tok = act.unbar_token()
+        self.assertEqual(act.unbar("C-marcus", tok, self.store), (True, "unblocked"))
+        self.assertFalse(act.unbar("C-marcus", tok, self.store)[0])       # single use
+        again = act.open_case(pipeline.run(Message(text="cupcakes were squished, refund $12", channel=Channel.BUSINESS,
+                              requested_action="refund", amount_usd=12, customer_id="C-marcus", customer_name="Marcus",
+                              order=OrderRecord(delivered=True, photo_provided=True))), self.store)
+        self.assertNotEqual(again["status"], "refused")
+        import verify_receipts
+        self.assertEqual(verify_receipts.verify(self.store), [])
+
+    def test_questions_from_a_blocked_person_still_get_answered(self):
+        fake = act.open_case(pipeline.run(self.FAKE), self.store)
+        act.decide(fake["id"], act.sign(fake["id"], "decide"), "bar", self.store)
+        q = act.open_case(pipeline.run(Message(text="what time do you open saturday?", channel=Channel.BUSINESS,
+                          customer_id="C-marcus", customer_name="Marcus")), self.store)
+        self.assertNotEqual(q["status"], "refused")

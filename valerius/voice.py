@@ -163,7 +163,29 @@ def if_yes(case: dict, fee: float | None) -> str:
 def if_no(case: dict) -> str:
     if case.get("channel") == "family":
         return "it stays marked as a scam. Nothing gets sent."
-    return f"nothing moves, and {who(case).lower() if who(case) == 'A customer' else who(case)} gets a note right away explaining why."
+    name = who(case).lower() if who(case) == "A customer" else who(case)
+    denied = {"refund": "the refund is denied. No money moves",
+              "reship": "no replacement is sent",
+              "cancel": "the order stays as it is",
+              "payment_change": "the card on file stays the same",
+              "account_change": "the account stays the same"}.get(case.get("requested_action", ""), "nothing happens")
+    return f"{denied}, and {name} gets a note right away."
+
+
+def bar_button(case: dict) -> str:
+    return f"Deny and block {who(case)}" if case.get("customer_name") else "Deny and block this person"
+
+
+def if_bar(case: dict) -> str:
+    name = who(case)
+    return (f"the request is denied, and {name} can't get refunds, replacements or account changes through your agent "
+            "until you unblock them. They aren't told they're blocked.")
+
+
+def barred_note(case: dict) -> str:
+    """What a blocked person hears. Plain and final, without saying they're blocked or inviting a back-and-forth."""
+    name = case.get("customer_name") or "there"
+    return f"Hi {name}, we're not able to help with this request."
 
 
 def customer_note(case: dict) -> str:
@@ -215,5 +237,5 @@ def buttons(case: dict) -> tuple[str, str]:
 def done(case: dict) -> str:
     """The receipt line, in the same words as the button that was pressed."""
     yes, no = buttons(case)
-    said = yes if case.get("status") == "approved" else no
+    said = yes if case.get("status") == "approved" else bar_button(case) if case.get("barred_person") else no
     return f"You chose: {said}."

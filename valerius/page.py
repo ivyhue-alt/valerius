@@ -132,6 +132,10 @@ padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -8px 24p
 @media (prefers-color-scheme:dark){.dock .yes{background:var(--brand-ink);color:var(--brand)}}
 .dock .no{color:var(--ink)}
 .dock .meta{max-width:488px;margin:8px auto 0}
+.dock .barbtn{grid-column:1/-1;background:var(--stop-bg);color:var(--stop);padding:12px 10px;font-size:.95rem}
+.outcome.b{margin:0 0 12px}.outcome.b b{color:var(--stop)}
+.brow{display:flex;justify-content:space-between;align-items:center;gap:10px}.brow small{display:block;color:var(--soft);font-size:.8rem}
+.btn.small{width:auto;padding:8px 14px;font-size:.9rem}
 .v .foot{text-align:center;padding:0 16px}
 .v .late{background:var(--amber-bg);border-radius:14px;padding:10px 12px;color:#8a5a00;margin:0 0 12px}
 @media (min-width:720px){body.v main{max-width:560px;margin:0 auto}.bar{border-radius:0 0 20px 20px}}
@@ -406,6 +410,11 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
             head += ("<div class=outcomes>"
                      f"<div class='outcome y'><b>If you say yes</b>{escape(yes_text[:1].upper() + yes_text[1:])}</div>"
                      f"<div class='outcome n'><b>If you say no</b>{escape(no_text[:1].upper() + no_text[1:])}</div></div>")
+            from .act import can_bar
+            if can_bar(case):
+                bar_text = voice.if_bar(case)
+                head += (f"<div class='outcome b'><b>If you block {escape(voice.who(case))}</b>"
+                         f"{escape(bar_text[:1].upper() + bar_text[1:])}</div>")
     else:
         head = (f"<h1>This looks like a scam.</h1>{_evidence_image(case).split('<p class=')[0]}"
                 f"<p class=why>{escape(why)}</p>"
@@ -421,8 +430,11 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
             left = 0
         expires = f"{left // 60} h {left % 60} min" if left >= 60 else f"{left} min"
         if business:
+            from .act import can_bar
             buttons = (f"<button class='btn yes' name=decision value=approve>{escape(yes)}</button>"
                        f"<button class='btn no' name=decision value=block>{escape(no)}</button>")
+            if can_bar(case):
+                buttons += f"<button class='btn barbtn' name=decision value=bar>{escape(voice.bar_button(case))}</button>"
         else:  # the safe choice comes first for families
             buttons = (f"<button class='btn primary-stop' name=decision value=block>{escape(no)}</button>"
                        f"<button class='btn no quiet' name=decision value=approve>{escape(yes)}</button>")
@@ -431,6 +443,7 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
                    f"<p class=meta>This link works once, for {escape(expires)} more.</p>")
 
     # ---- everything else, folded
+    from .act import can_bar
     folds = []
     if held and business:
         name = escape(voice.who(case))
@@ -439,7 +452,10 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
             f"<label for=ny>If you say yes</label><textarea id=ny name=note_yes rows=5 maxlength=1200 form=decide-form>"
             f"{escape(voice.customer_note(dict(case, status='approved')))}</textarea>"
             f"<label for=nn>If you say no</label><textarea id=nn name=note_no rows=5 maxlength=1200 form=decide-form>"
-            f"{escape(voice.customer_note(dict(case, status='blocked')))}</textarea></div></details>")
+            f"{escape(voice.customer_note(dict(case, status='blocked')))}</textarea>"
+            + (f"<p class=note>If you block them, they get: &ldquo;{escape(voice.barred_note(case))}&rdquo;</p>"
+               if can_bar(case) else "")
+            + "</div></details>")
     detail = []
     if case.get("text", "").strip() and (not business or len(case.get("text", "").strip()) > 240):
         detail.append(f"<div class=label>{'What they wrote' if business else 'The message'}</div>"
@@ -515,7 +531,8 @@ def receipt_page(case: dict, receipt: dict | None) -> str:
     business = case.get("channel") == "business"
     title = voice.done(case).replace("You chose: ", "").rstrip(".")
     fee = _fee(case["amount_usd"]) if case.get("amount_usd") is not None and case.get("requested_action") in ("refund", "cancel") else None
-    result = voice.if_yes(case, fee) if status == "approved" else voice.if_no(case)
+    result = (voice.if_yes(case, fee) if status == "approved" else
+              voice.if_bar(case) if case.get("barred_person") else voice.if_no(case))
     result = result[:1].upper() + result[1:]
     got = (f"<div class=label>What {escape(voice.who(case))} got</div><div class=msg>{escape(case['customer_note'])}</div>"
            if business and case.get("customer_note") else "")
@@ -581,7 +598,8 @@ def intake_result(risk: str, held: bool, reply: str, link: str = "") -> str:
 
 def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dict[str, str],
                     agent_token: dict[str, str] | None, agent_paused: bool, view: str = "waiting",
-                    tab_query: str = "", claim_counts: dict[str, int] | None = None) -> str:
+                    tab_query: str = "", claim_counts: dict[str, int] | None = None,
+                    barred: dict | None = None, unbar_token: dict[str, str] | None = None) -> str:
     """The owner's phone: a short list of people waiting on a decision, then what already happened."""
     from . import voice
 
@@ -599,7 +617,9 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
 
     def past(c: dict) -> str:
         status = str(c.get("status"))
-        outcome = {"approved": ("ok", "You said yes"), "blocked": ("bad", "You said no"),
+        outcome = {"approved": ("ok", "You said yes"),
+                   "blocked": ("bad", "You blocked them" if c.get("barred_person") else "You said no"),
+                   "refused": ("bad", "Refused (blocked)"),
                    "allowed": ("ok", "Handled by your agent")}.get(status, ("", status))
         amt = c.get("amount_usd")
         return (f"<li><div class=row><div class=av>{_initial(c)}</div><div class=main><div class=name>{escape(_name(c))}</div>"
@@ -625,6 +645,18 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
         folds += (f"<details><summary>Something feels off?</summary><div class=inner><p class=note>Pause your agent and "
                   f"everything it asks for waits for you.</p><form method=post action='/agent/{path}'>{hidden}"
                   f"<button class='btn no'>{verb}</button></form></div></details>")
+    if barred:
+        rows = []
+        for cid, b in barred.items():
+            hid = "".join(f"<input type=hidden name='{k}' value='{escape(str((unbar_token or {}).get(k, '')))}'>"
+                          for k in TOKEN_KEYS)
+            who = escape(b.get("name") or (f"Customer ending {cid[-4:]}" if len(cid) >= 4 else "Customer"))
+            rows.append(f"<li class=brow><span>{who}<small>since {escape(_date(b.get('at')))}</small></span>"
+                        + (f"<form method=post action='/barred/unblock'>{hid}<input type=hidden name=who value='{escape(cid)}'>"
+                           "<button class='btn no small'>Unblock</button></form>" if unbar_token else "") + "</li>")
+        folds += (f"<details><summary>People you blocked ({len(barred)})</summary><div class=inner><p class=note>They "
+                  "pretended to be you or your staff. Their refunds, replacements and account changes are refused, "
+                  f"and they aren't told why.</p><ul class=lines>{''.join(rows)}</ul></div></details>")
     state = ("<span><span class='dot off'></span>Agent paused</span>" if agent_paused else
              "<span><span class=dot></span>Agent on</span>")
     q = escape(tab_query)

@@ -73,12 +73,19 @@ The WhatsApp webhook is built and tested against Meta's webhook format, with sig
 ## How a held action works
 
 1. A risky request is held. The customer gets a fixed holding message; nothing is improvised.
-2. The owner gets a signed link that expires in 2 hours and works once.
+2. The owner gets a signed link that expires in 2 hours and works once. The hold itself never expires: nothing happens
+   until the owner decides, and the dashboard always makes a fresh link.
 3. The approval page shows the message with the evidence highlighted, why it was held, the model reviews, and the owner's own rules.
 4. Approve or block. Every hold, decision, pause and resume writes a signed receipt chained to the one before.
 5. `verify_receipts.py` reruns the rules on every case and checks the chain. No model is needed to check a decision.
 
 The owner can also pause the agent: every action it asks for is then held until they resume it.
+
+When someone poses as the owner or staff, and the owner has turned the option on, the page offers a third choice:
+deny and block them. A blocked person's refunds, replacements and account changes are refused from then on without
+asking the owner again; their questions still get answered, and they aren't told they're blocked. The dashboard lists
+everyone blocked, with an unblock button. Valerius can't stop someone placing orders: that needs the store's own
+platform.
 
 The customer hears back the moment the owner decides. The owner sees both drafts (yes and no) on the decision page and can change either one first, for a sick family member or a hard week. A yes on something outside the owner's rules tells the customer it's a one-time courtesy.
 

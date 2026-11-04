@@ -49,6 +49,13 @@ def build(cases: list[dict], days: int = 30, now: int | None = None) -> dict:
     claims: dict[str, list[dict]] = defaultdict(list)
     for c in biz:
         status, act, amt = c.get("status"), c.get("requested_action", ""), c.get("amount_usd")
+        if status == "refused":            # someone the owner blocked: refused without asking the owner again
+            out["handled_alone"] += 1
+            out["declined"] += 1
+            if act == "refund" and amt is not None:
+                out["kept_usd"] += float(amt)
+            out["fraud"] += 1
+            continue
         if status == "allowed":
             out["handled_alone"] += 1
         else:

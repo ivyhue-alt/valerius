@@ -188,7 +188,8 @@ class Handler(BaseHTTPRequestHandler):
                       for c in cases if c.get("status") == "held" and c.get("customer_id")}
             tab_q = urlencode({k: q.get(k, "") for k in act_keys()})
             return self._send(200, page.owner_dashboard(cases, act.track_record(STORE), links, act.agent_token(),
-                                                        bool(agent.get("paused")), q.get("view", "waiting"), tab_q, counts))
+                                                        bool(agent.get("paused")), q.get("view", "waiting"), tab_q, counts,
+                                                        STORE.barred(), act.unbar_token()))
         if u.path == "/webhook":
             if q.get("hub.mode") == "subscribe" and SETTINGS.whatsapp_verify_token and \
                     hmac.compare_digest(q.get("hub.verify_token", ""), SETTINGS.whatsapp_verify_token):
@@ -264,6 +265,11 @@ class Handler(BaseHTTPRequestHandler):
                 case = STORE.load_case(m.group(1))
                 return self._send(200, page.receipt_page(case, act.last_receipt(STORE, m.group(1))))
             return self._send(403, page.result_page("Could not record that", info))
+        if u.path == "/barred/unblock":
+            ok, info = act.unbar(form.get("who", ""), form, STORE)
+            return self._send(200 if ok else 403, page.result_page(
+                "Unblocked" if ok else "Could not unblock",
+                "Their requests go through your normal rules again." if ok else info))
         m = re.fullmatch(r"/agent/(pause|resume)", u.path)
         if m:
             ok, info = act.switch_agent(m.group(1) == "pause", form, STORE)

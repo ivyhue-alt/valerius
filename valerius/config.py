@@ -50,6 +50,7 @@ class PolicyCard:
     open_hour: int = 9                       # business hours, local time; holds outside them wait for opening
     close_hour: int = 21
     after_hours: str = "queue"               # "queue": one summary at opening; "notify": ping the owner anyway
+    offer_block: bool = True                 # owner opted in: when someone poses as the owner or staff, offer to block them
 
     def lines(self) -> list[str]:
         return [
@@ -57,6 +58,8 @@ class PolicyCard:
             f"A customer's claim number {self.max_claims + 1} or more within {self.claim_window_days} days: owner decides.",
             f"Cancel before the payment is taken (or within {self.free_cancel_minutes} minutes if that's unknown) and before shipping: agent may do it, any time of day.",
             "Damage claims without a photo, later cancellations, payment changes and account changes: owner approves.",
+            *(["Someone who pretends to be you or your staff: you can deny it and block them. A blocked person's refunds, "
+               "replacements and account changes are refused until you unblock them."] if self.offer_block else []),
             (f"Outside {self._hour(self.open_hour)} to {self._hour(self.close_hour)}, holds wait quietly and you get one "
              f"summary when you open." if self.after_hours == "queue" else
              f"Outside {self._hour(self.open_hour)} to {self._hour(self.close_hour)}, you still get a message right away."),

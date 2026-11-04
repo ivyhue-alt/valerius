@@ -98,6 +98,14 @@ class Store:
     def set_agent(self, state: dict) -> None:
         self.agent_path.write_text(json.dumps(state), encoding="utf-8")
 
+    # people the owner blocked (stored by customer id; never their phone number in a receipt)
+    def barred(self) -> dict:
+        p = self.root / "barred.json"
+        return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
+
+    def set_barred(self, barred: dict) -> None:
+        (self.root / "barred.json").write_text(json.dumps(barred), encoding="utf-8")
+
 
 # ------------------------------------------------------------------ links
 
@@ -214,6 +222,11 @@ def open_case(result: Result, store: Store, now: int | None = None) -> dict:
     # When paused, anything that looks like an action is held, even if the agent left the action field blank.
     asks_for_action = bool(msg.requested_action) or bool(implied_actions(msg.text)) or msg.amount_usd is not None
     hold = result.hold or (paused and asks_for_action)
+    # The owner blocked this person after they posed as the owner or staff: money and account actions are refused.
+    barred = (msg.channel == "business" and bool(msg.customer_id) and msg.customer_id in store.barred()
+              and asks_for_action)
+    if barred:
+        hold = False
     case = {
         "id": uuid.uuid4().hex[:12],
         "created_at": now if now is not None else int(time.time()),
@@ -243,10 +256,14 @@ def open_case(result: Result, store: Store, now: int | None = None) -> dict:
         "unverified": result.unverified,
         "disagreement": result.disagreement,
         "paused_agent": paused,
-        "status": "held" if hold else "allowed",
+        "status": "refused" if barred else "held" if hold else "allowed",
         "used_nonces": [],
         "decision": None,
     }
+    if barred:
+        from . import voice
+        case["barred"] = True
+        case["customer_note"] = voice.barred_note(case)
     if hold:
         tok = sign(case["id"], "decide")
         case["link"] = link(tok)
@@ -278,7 +295,7 @@ def clean_note(text: str) -> str:
 
 def decide(case_id: str, token: dict[str, str], decision: str, store: Store, actor: str = "owner",
            note: str | None = None) -> tuple[bool, str]:
-    if decision not in ("approve", "block"):
+    if decision not in ("approve", "block", "bar"):
         return False, "unknown decision"
     with _LOCK:
         case = store.load_case(case_id)
@@ -289,18 +306,59 @@ def decide(case_id: str, token: dict[str, str], decision: str, store: Store, act
         why = check_token(token, case["used_nonces"], purpose="decide")
         if why:
             return False, why
+        if decision == "bar" and not can_bar(case):
+            return False, "blocking is only offered when someone poses as the owner or staff"
         case["used_nonces"].append(token["n"])
         case["status"] = "approved" if decision == "approve" else "blocked"
+        if decision == "bar":
+            case["barred_person"] = True
+            barred = store.barred()
+            barred[case["customer_id"]] = {"name": case.get("customer_name", ""), "at": int(time.time()),
+                                           "case_id": case_id}
+            store.set_barred(barred)
         case["decision"] = {"by": actor, "at": int(time.time())}
         from . import voice
         # The owner saw the draft on the decision page and may have edited it. Empty means use the draft.
         edited = clean_note(note) if note is not None else ""
-        case["customer_note"] = edited or voice.customer_note(case)
-        case["note_edited"] = bool(edited) and edited != voice.customer_note(case)
+        draft = voice.barred_note(case) if decision == "bar" else voice.customer_note(case)
+        case["customer_note"] = edited or draft
+        case["note_edited"] = bool(edited) and edited != draft
         store.save_case(case)
     store.append_receipt({"event": case["status"], "case_id": case_id, "message_sha256": sha256(case["text"]),
-                          "rules": case["rules"], "models": case["models"], "actor": actor})
+                          "rules": case["rules"], "models": case["models"], "actor": actor,
+                          **({"blocked_person": True} if decision == "bar" else {})})
     return True, case["status"]
+
+
+def can_bar(case: dict) -> bool:
+    """Blocking is offered only when the owner opted in and someone posed as the owner or staff."""
+    return (SETTINGS.policy.offer_block and case.get("channel") == "business" and bool(case.get("customer_id"))
+            and any(f.get("rule") == "owner_impersonation" for f in case.get("findings", [])))
+
+
+def unbar_token() -> dict[str, str]:
+    return sign("barred", "unbar")
+
+
+def unbar(customer_id: str, token: dict[str, str], store: Store, actor: str = "owner") -> tuple[bool, str]:
+    """Unblock someone, with a signed, single-use owner token."""
+    with _LOCK:
+        if token.get("c") != "barred" or token.get("p") != "unbar":
+            return False, "link is not an unblock link"
+        state = store.agent()
+        why = check_token(token, state.get("unbar_nonces", []), purpose="unbar")
+        if why:
+            return False, why
+        barred = store.barred()
+        if customer_id not in barred:
+            return False, "that person isn't blocked"
+        barred.pop(customer_id)
+        store.set_barred(barred)
+        now = int(time.time())
+        state["unbar_nonces"] = [u for u in state.get("unbar_nonces", []) if int(u[1]) >= now] + [[token["n"], int(token["e"])]]
+        store.set_agent(state)
+    store.append_receipt({"event": "unblocked_person", "case_id": "", "actor": actor})
+    return True, "unblocked"
 
 
 def set_paused(paused: bool, store: Store, actor: str = "owner") -> None:

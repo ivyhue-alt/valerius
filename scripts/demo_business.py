@@ -75,6 +75,9 @@ def main(argv: list[str]) -> int:
     if case["status"] == "held":
         print("Agent tells the customer:  " + act.holding_message())
         print("Owner gets:                " + act.owner_alert(case))
+    elif case["status"] == "refused":
+        print("You blocked this person earlier. Refused without asking you.")
+        print("Agent tells the customer:  " + case["customer_note"])
     else:
         print("Allowed under the owner's rules.")
     return 0
