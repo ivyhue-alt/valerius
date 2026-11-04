@@ -141,9 +141,11 @@ def handle_check(text: str, data: bytes, store: act.Store = STORE, live: bool | 
 class Handler(BaseHTTPRequestHandler):
     server_version = "Valerius"
 
-    def _send(self, code: int, body: str, ctype: str = "text/html; charset=utf-8") -> None:
+    def _send(self, code: int, body: str, ctype: str = "text/html; charset=utf-8", cookie: str = "") -> None:
         data = body.encode("utf-8")
         self.send_response(code)
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
@@ -154,6 +156,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Referrer-Policy", "no-referrer")
         self.end_headers()
         self.wfile.write(data)
+
+    def _skip_confirm(self) -> bool:
+        return f"{NO_CONFIRM}=1" in (self.headers.get("Cookie", "") or "").replace(" ", "").split(";")
 
     def log_message(self, fmt: str, *args) -> None:  # keep tokens out of logs
         sys.stderr.write(f"{self.command} {urlparse(self.path).path} -> {args[1] if len(args) > 1 else ''}\n")
@@ -189,7 +194,11 @@ class Handler(BaseHTTPRequestHandler):
             tab_q = urlencode({k: q.get(k, "") for k in act_keys()})
             return self._send(200, page.owner_dashboard(cases, act.track_record(STORE), links, act.agent_token(),
                                                         bool(agent.get("paused")), q.get("view", "waiting"), tab_q, counts,
-                                                        STORE.barred(), act.unbar_token()))
+                                                        STORE.barred(), act.unbar_token(), not self._skip_confirm()))
+        if u.path == "/prefs/confirm":
+            # Turn the "are you sure?" step back on for this phone. Only removes a cookie, so it needs no link secret.
+            return self._send(200, page.result_page("Done", "You'll be asked to confirm each decision on this phone again."),
+                              cookie=f"{NO_CONFIRM}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict")
         if u.path == "/webhook":
             if q.get("hub.mode") == "subscribe" and SETTINGS.whatsapp_verify_token and \
                     hmac.compare_digest(q.get("hub.verify_token", ""), SETTINGS.whatsapp_verify_token):
@@ -260,10 +269,22 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             choice = form.get("decision", "")
             note = form.get("note_yes" if choice == "approve" else "note_no")
+            case = STORE.load_case(m.group(1))
+            # Business decisions move money, so ask once more unless the owner turned that off on this phone.
+            # Nothing is decided and the link isn't used until they confirm.
+            if (case and case.get("channel") == "business" and form.get("confirmed") != "1"
+                    and not self._skip_confirm() and choice in ("approve", "block", "bar")):
+                why = act.check_token(form, case.get("used_nonces", []), purpose="decide")
+                if why or case.get("status") != "held" or form.get("c") != case.get("id"):
+                    return self._send(403, page.result_page("Could not record that", why or "this case was already decided"))
+                return self._send(200, page.confirm_page(case, form, choice))
             ok, info = act.decide(m.group(1), form, choice, STORE, note=note)
             if ok:
                 case = STORE.load_case(m.group(1))
-                return self._send(200, page.receipt_page(case, act.last_receipt(STORE, m.group(1))))
+                cookie = (f"{NO_CONFIRM}=1; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict"
+                          + ("; Secure" if SETTINGS.approval_base_url.startswith("https") else "")) \
+                    if form.get("no_confirm") == "1" else ""
+                return self._send(200, page.receipt_page(case, act.last_receipt(STORE, m.group(1))), cookie=cookie)
             return self._send(403, page.result_page("Could not record that", info))
         if u.path == "/barred/unblock":
             ok, info = act.unbar(form.get("who", ""), form, STORE)
@@ -278,6 +299,9 @@ class Handler(BaseHTTPRequestHandler):
                       else "The agent is running again under your normal rules." if info == "resumed" else info)
             return self._send(200 if ok else 403, page.result_page(title, detail))
         return self._send(404, "not found", "text/plain")
+
+
+NO_CONFIRM = "v_no_confirm"
 
 
 def _loopback(host: str) -> bool:

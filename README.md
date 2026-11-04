@@ -76,7 +76,9 @@ The WhatsApp webhook is built and tested against Meta's webhook format, with sig
 2. The owner gets a signed link that expires in 2 hours and works once. The hold itself never expires: nothing happens
    until the owner decides, and the dashboard always makes a fresh link.
 3. The approval page shows the message with the evidence highlighted, why it was held, the model reviews, and the owner's own rules.
-4. Approve or block. Every hold, decision, pause and resume writes a signed receipt chained to the one before.
+4. Approve or block. A business decision asks "Are you sure?" once, showing exactly what the customer will get, so a
+   mistaken tap on a phone can be taken back; the owner can turn that off per phone and back on from the dashboard.
+   Every hold, decision, pause and resume writes a signed receipt chained to the one before.
 5. `verify_receipts.py` reruns the rules on every case and checks the chain. No model is needed to check a decision.
 
 The owner can also pause the agent: every action it asks for is then held until they resume it.

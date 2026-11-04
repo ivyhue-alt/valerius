@@ -81,7 +81,7 @@ label{display:block;font-size:.9rem;color:var(--soft);margin:16px 0 6px}
 .bars{list-style:none;margin:10px 0 0;padding:0}.bars li{margin:0 0 14px}
 .bars .top2{display:flex;justify-content:space-between;font-size:.95rem}
 .bar{height:8px;border-radius:4px;background:var(--fill);margin:6px 0 4px;overflow:hidden}
-.bar i{display:block;height:100%;background:var(--ink);border-radius:4px}
+.bar i{display:block;height:100%;background:var(--accent,#111827);border-radius:4px}
 .bars q{display:block;font-size:.85rem;color:var(--soft);quotes:"\\201C" "\\201D"}
 .receipt{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;overflow-wrap:anywhere;color:var(--soft)}
 .foot{margin-top:30px;font-size:.82rem;color:var(--faint)}
@@ -93,10 +93,10 @@ label{display:block;font-size:.9rem;color:var(--soft);margin:16px 0 6px}
 --go-bg:#0f2a1c;--shadow:none}}
 body.v{background:var(--fill)}
 body.v main{padding:0 0 120px}
-.bar{background:var(--brand);color:var(--brand-ink);padding:14px 20px 18px;display:flex;justify-content:space-between;align-items:center;
+.appbar{background:var(--brand);color:var(--brand-ink);padding:14px 20px 18px;display:flex;justify-content:space-between;align-items:center;
 font-size:.85rem}
-.bar .mark{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.01em;font-size:.95rem}
-.bar .mark svg{flex:none}.bar .when{opacity:.7}
+.appbar .mark{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.01em;font-size:.95rem}
+.appbar .mark svg{flex:none}.appbar .when{opacity:.7}
 .wrap{padding:0 16px}
 .hero{background:var(--card);border-radius:20px;padding:18px 18px 16px;margin:-6px 0 12px;box-shadow:var(--shadow);position:relative}
 .state{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
@@ -136,9 +136,14 @@ padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -8px 24p
 .outcome.b{margin:0 0 12px}.outcome.b b{color:var(--stop)}
 .brow{display:flex;justify-content:space-between;align-items:center;gap:10px}.brow small{display:block;color:var(--soft);font-size:.8rem}
 .btn.small{width:auto;padding:8px 14px;font-size:.9rem}
+.v .btn.yes{background:var(--brand);color:var(--brand-ink)}.v .btn.stopbtn{background:var(--stop);color:#fff}
+.v .panel .actions{margin:12px 0 16px}.v .hero h1{font-size:1.6rem;margin:0 0 8px}
+label.check{display:flex;gap:10px;align-items:center;color:var(--ink);font-size:.95rem;margin:16px 0 0;cursor:pointer}
+label.check input{width:20px;height:20px;accent-color:var(--brand)}
+.v .done-list .name,.v .done-list .right{color:var(--soft);font-weight:500}
 .v .foot{text-align:center;padding:0 16px}
 .v .late{background:var(--amber-bg);border-radius:14px;padding:10px 12px;color:#8a5a00;margin:0 0 12px}
-@media (min-width:720px){body.v main{max-width:560px;margin:0 auto}.bar{border-radius:0 0 20px 20px}}
+@media (min-width:720px){body.v main{max-width:560px;margin:0 auto}.appbar{border-radius:0 0 20px 20px}}
 /* receipt */
 .ticket{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin:-6px 0 12px;position:relative;overflow:hidden}
 .ticket .tp{padding:22px 18px 18px}.ticket .bt{padding:16px 18px 18px;border-top:2px dashed var(--line)}
@@ -222,7 +227,7 @@ def _shell(title: str, body: str, after: str = "", look: str = "") -> str:
 
 
 def _bar(left: str, right: str = "") -> str:
-    return (f"<div class=bar><span class=mark>{LOGO}{escape(left)}</span>"
+    return (f"<div class=appbar><span class=mark>{LOGO}{escape(left)}</span>"
             f"<span class=when>{right}</span></div>")
 
 
@@ -509,6 +514,48 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
     return _shell("Valerius", body)
 
 
+def confirm_page(case: dict, form: dict[str, str], choice: str) -> str:
+    """One more look before money moves, so a mistaken tap on a phone can be taken back."""
+    from urllib.parse import urlencode
+    from . import voice
+    who = voice.who(case)
+    who = "this customer" if who == "A customer" else who
+    amt = case.get("amount_usd")
+    money = f"${float(amt):,.0f}" if amt is not None else ""
+    yes, no = voice.buttons(case)
+    fee = _fee(amt) if amt is not None and case.get("requested_action") in ("refund", "cancel") else None
+    if choice == "approve":
+        title = {"refund": f"Send {money} back to {who}?", "reship": f"Send {who} a replacement?",
+                 "cancel": f"Cancel {who}'s order?"}.get(case.get("requested_action", ""), f"{yes} for {who}?")
+        result, label, cls = voice.if_yes(case, fee), yes, "yes"
+        draft = voice.customer_note(dict(case, status="approved"))
+        note = form.get("note_yes") or draft
+    elif choice == "bar":
+        title, result, label, cls = f"Deny and block {who}?", voice.if_bar(case), voice.bar_button(case), "stopbtn"
+        note = draft = voice.barred_note(case)
+    else:
+        title = {"refund": f"Deny {who}'s refund?"}.get(case.get("requested_action", ""), f"{no}?")
+        result, label, cls = voice.if_no(case), no, "stopbtn"
+        draft = voice.customer_note(dict(case, status="blocked"))
+        note = form.get("note_no") or draft
+    keep = {k: form.get(k, "") for k in TOKEN_KEYS}
+    hidden = "".join(f"<input type=hidden name='{k}' value='{escape(v)}'>" for k, v in keep.items())
+    hidden += (f"<input type=hidden name=decision value='{escape(choice)}'><input type=hidden name=confirmed value=1>"
+               f"<input type=hidden name=note_yes value='{escape(form.get('note_yes', ''))}'>"
+               f"<input type=hidden name=note_no value='{escape(form.get('note_no', ''))}'>")
+    back = f"/case/{escape(str(case.get('id', '')))}?{escape(urlencode(keep))}"
+    body = (_bar(SETTINGS.policy.business_name, "Check before it goes")
+            + "<div class=wrap><section class=hero><span class=state><i></i>Are you sure?</span>"
+            f"<h1>{escape(title)}</h1><p class=note>{escape(result[:1].upper() + result[1:])}</p></section>"
+            f"<section class=chat><small>What {escape(who)} will get{' (you edited this)' if note.strip() != draft.strip() else ''}</small><div class=bubble>{escape(note)}</div></section>"
+            f"<form method=post action='/case/{escape(str(case.get('id', '')))}/decide' class=panel>{hidden}"
+            "<label class=check><input type=checkbox name=no_confirm value=1> Don't ask me again on this phone</label>"
+            f"<div class=actions><button class='btn {cls}'>Yes, {escape(label[:1].lower() + label[1:])}</button>"
+            f"<a class='btn no' href='{back}'>Go back</a></div></form>"
+            "<p class=foot>Nothing has happened yet. Going back keeps everything as it is.</p></div>")
+    return _shell("Are you sure?", body, look="v")
+
+
 def _evidence_label(field: str, value: str) -> str:
     if field.startswith("image."):
         name = field[6:].replace("_", " ")
@@ -599,7 +646,8 @@ def intake_result(risk: str, held: bool, reply: str, link: str = "") -> str:
 def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dict[str, str],
                     agent_token: dict[str, str] | None, agent_paused: bool, view: str = "waiting",
                     tab_query: str = "", claim_counts: dict[str, int] | None = None,
-                    barred: dict | None = None, unbar_token: dict[str, str] | None = None) -> str:
+                    barred: dict | None = None, unbar_token: dict[str, str] | None = None,
+                    confirm_on: bool = True) -> str:
     """The owner's phone: a short list of people waiting on a decision, then what already happened."""
     from . import voice
 
@@ -634,9 +682,11 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
     n = len(waiting)
     words = ["", "One thing", "Two things", "Three things", "Four things", "Five things"]
     headline = "You're all caught up." if n == 0 else f"{words[n] if n < 6 else str(n) + ' things'} need{'s' if n == 1 else ''} you."
-    waiting_html = (f"<ul class=list>{''.join(row(c) for c in waiting)}</ul>" if waiting else
+    waiting_html = (f"<div class=section>Waiting for you: tap one to decide</div><ul class=list>"
+                    f"{''.join(row(c) for c in waiting)}</ul>" if waiting else
                     "<p class=note>Your agent is handling everything within your rules. Anything that needs you shows up here.</p>")
-    done_html = (f"<div class=section>Earlier</div><ul class=list>{''.join(past(c) for c in done)}</ul>" if done else "")
+    done_html = (f"<div class=section>Already decided, nothing to do</div><ul class='list done-list'>"
+                 f"{''.join(past(c) for c in done)}</ul>" if done else "")
     rules = "".join(f"<li>{escape(x)}</li>" for x in SETTINGS.policy.lines())
     folds = f"<details><summary>Your rules</summary><div class=inner><ul class=lines>{rules}</ul></div></details>"
     if agent_token:
@@ -645,6 +695,10 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
         folds += (f"<details><summary>Something feels off?</summary><div class=inner><p class=note>Pause your agent and "
                   f"everything it asks for waits for you.</p><form method=post action='/agent/{path}'>{hidden}"
                   f"<button class='btn no'>{verb}</button></form></div></details>")
+    if not confirm_on:
+        folds += ("<details><summary>Ask me before each decision: off</summary><div class=inner><p class=note>On this "
+                  "phone, your taps go through without the \"Are you sure?\" step.</p>"
+                  "<a class='btn no small' href='/prefs/confirm'>Turn it back on</a></div></details>")
     if barred:
         rows = []
         for cid, b in barred.items():

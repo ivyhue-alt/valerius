@@ -400,3 +400,57 @@ class BlockPeople(Base):
         q = act.open_case(pipeline.run(Message(text="what time do you open saturday?", channel=Channel.BUSINESS,
                           customer_id="C-marcus", customer_name="Marcus")), self.store)
         self.assertNotEqual(q["status"], "refused")
+
+
+class ConfirmStep(Server):
+    """A mistaken tap on a phone can be taken back: business decisions ask once more, unless turned off."""
+
+    def _held(self):
+        case = act.open_case(pipeline.run(REFUND), self.store)
+        form = dict(act.sign(case["id"], "decide"), decision="approve")
+        return case, form
+
+    def test_first_tap_only_asks(self):
+        case, form = self._held()
+        status, html = self.post(f"/case/{case['id']}/decide", urllib.parse.urlencode(form).encode())
+        self.assertEqual(status, 200)
+        self.assertIn("Are you sure?", html)
+        self.assertIn("Go back", html)
+        self.assertIn("Don't ask me again on this phone", html)
+        self.assertEqual(self.store.load_case(case["id"])["status"], "held")       # nothing happened yet
+        form["confirmed"] = "1"
+        status, html = self.post(f"/case/{case['id']}/decide", urllib.parse.urlencode(form).encode())
+        self.assertIn("You chose", html)
+        self.assertEqual(self.store.load_case(case["id"])["status"], "approved")
+
+    def test_going_back_keeps_the_link_working(self):
+        case, form = self._held()
+        self.post(f"/case/{case['id']}/decide", urllib.parse.urlencode(form).encode())
+        keep = {k: form[k] for k in page.TOKEN_KEYS}
+        status, _ = self.get(f"/case/{case['id']}?{urllib.parse.urlencode(keep)}")
+        self.assertEqual(status, 200)
+
+    def test_dont_ask_again_sets_a_cookie_and_it_can_be_turned_back_on(self):
+        case, form = self._held()
+        form.update(confirmed="1", no_confirm="1")
+        req = urllib.request.Request(f"http://127.0.0.1:{self.port}/case/{case['id']}/decide",
+                                     data=urllib.parse.urlencode(form).encode(), method="POST")
+        with urllib.request.urlopen(req) as r:
+            cookie = r.headers.get("Set-Cookie", "")
+        self.assertIn("v_no_confirm=1", cookie)
+        self.assertIn("HttpOnly", cookie)
+        case2 = act.open_case(pipeline.run(REFUND), self.store)
+        form2 = dict(act.sign(case2["id"], "decide"), decision="block")
+        req = urllib.request.Request(f"http://127.0.0.1:{self.port}/case/{case2['id']}/decide",
+                                     data=urllib.parse.urlencode(form2).encode(), method="POST",
+                                     headers={"Cookie": "v_no_confirm=1"})
+        with urllib.request.urlopen(req) as r:
+            self.assertIn("You chose", r.read().decode())                       # straight through
+        with urllib.request.urlopen(f"http://127.0.0.1:{self.port}/prefs/confirm") as r:
+            self.assertIn("Max-Age=0", r.headers.get("Set-Cookie", ""))
+
+    def test_forged_link_gets_no_confirm_page(self):
+        case, form = self._held()
+        form["s"] = "bad"
+        status, html = self.post(f"/case/{case['id']}/decide", urllib.parse.urlencode(form).encode())
+        self.assertEqual(status, 403)
