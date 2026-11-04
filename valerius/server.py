@@ -315,7 +315,7 @@ class Handler(BaseHTTPRequestHandler):
         m = re.fullmatch(r"/case/([a-f0-9]{12})/decide", u.path)
         if m:
             choice = form.get("decision", "")
-            note = form.get("note_yes" if choice == "approve" else "note_no")
+            note = form.get({"approve": "note_yes", "bar": "note_bar"}.get(choice, "note_no"))
             case = STORE.load_case(m.group(1))
             # Business decisions move money, so ask once more unless the owner turned that off on this phone.
             # Nothing is decided and the link isn't used until they confirm.

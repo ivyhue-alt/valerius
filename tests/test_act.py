@@ -370,7 +370,8 @@ class BlockPeople(Base):
         ok, _ = act.decide(fake["id"], act.sign(fake["id"], "decide"), "bar", self.store)
         self.assertTrue(ok)
         done = self.store.load_case(fake["id"])
-        self.assertEqual(done["customer_note"], "Hi Marcus, we're not able to help with this request.")
+        self.assertTrue(done["customer_note"].startswith("Hi Marcus, we can't process this request."))
+        self.assertNotIn("reply here", done["customer_note"])
         self.assertTrue(any(r.get("blocked_person") for r in self.store.receipts()))
         receipt = page.receipt_page(done, act.last_receipt(self.store, fake["id"]))
         self.assertIn("Deny and block Marcus", receipt)
@@ -454,3 +455,25 @@ class ConfirmStep(Server):
         form["s"] = "bad"
         status, html = self.post(f"/case/{case['id']}/decide", urllib.parse.urlencode(form).encode())
         self.assertEqual(status, 403)
+
+
+
+class BlockReply(Server):
+    """Blocking always answers the customer, with the block reply, never the ordinary 'no'."""
+
+    def test_block_sends_the_block_reply_even_when_the_page_sent_the_no_draft(self):
+        fake = act.open_case(pipeline.run(BlockPeople.FAKE), self.store)
+        form = dict(act.sign(fake["id"], "decide"), decision="bar", confirmed="1",
+                    note_no="Hi Marcus, ... just reply here and we'll talk it through.", note_bar="")
+        status, html = self.post(f"/case/{fake['id']}/decide", urllib.parse.urlencode(form).encode())
+        self.assertEqual(status, 200)
+        note = self.store.load_case(fake["id"])["customer_note"]
+        self.assertIn("we can't process this request", note)
+        self.assertNotIn("talk it through", note)
+
+    def test_owner_can_edit_the_block_reply(self):
+        fake = act.open_case(pipeline.run(BlockPeople.FAKE), self.store)
+        form = dict(act.sign(fake["id"], "decide"), decision="bar", confirmed="1",
+                    note_bar="Hi Marcus, we can't help with this one.")
+        self.post(f"/case/{fake['id']}/decide", urllib.parse.urlencode(form).encode())
+        self.assertEqual(self.store.load_case(fake["id"])["customer_note"], "Hi Marcus, we can't help with this one.")

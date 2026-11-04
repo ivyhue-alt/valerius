@@ -461,8 +461,8 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
             f"{escape(voice.customer_note(dict(case, status='approved')))}</textarea>"
             f"<label for=nn>If you say no</label><textarea id=nn name=note_no rows=5 maxlength=1200 form=decide-form>"
             f"{escape(voice.customer_note(dict(case, status='blocked')))}</textarea>"
-            + (f"<p class=note>If you block them, they get: &ldquo;{escape(voice.barred_note(case))}&rdquo;</p>"
-               if can_bar(case) else "")
+            + (f"<label for=nb>If you block them</label><textarea id=nb name=note_bar rows=4 maxlength=1200 "
+               f"form=decide-form>{escape(voice.barred_note(case))}</textarea>" if can_bar(case) else "")
             + "</div></details>")
     detail = []
     if case.get("text", "").strip() and (not business or len(case.get("text", "").strip()) > 240):
@@ -639,7 +639,8 @@ def confirm_page(case: dict, form: dict[str, str], choice: str) -> str:
         note = form.get("note_yes") or draft
     elif choice == "bar":
         title, result, label, cls = f"Deny and block {who}?", voice.if_bar(case), voice.bar_button(case), "stopbtn"
-        note = draft = voice.barred_note(case)
+        draft = voice.barred_note(case)
+        note = form.get("note_bar") or draft
     else:
         title = {"refund": f"Deny {who}'s refund?"}.get(case.get("requested_action", ""), f"{no}?")
         result, label, cls = voice.if_no(case), no, "stopbtn"
@@ -649,7 +650,8 @@ def confirm_page(case: dict, form: dict[str, str], choice: str) -> str:
     hidden = "".join(f"<input type=hidden name='{k}' value='{escape(v)}'>" for k, v in keep.items())
     hidden += (f"<input type=hidden name=decision value='{escape(choice)}'><input type=hidden name=confirmed value=1>"
                f"<input type=hidden name=note_yes value='{escape(form.get('note_yes', ''))}'>"
-               f"<input type=hidden name=note_no value='{escape(form.get('note_no', ''))}'>")
+               f"<input type=hidden name=note_no value='{escape(form.get('note_no', ''))}'>"
+               f"<input type=hidden name=note_bar value='{escape(form.get('note_bar', ''))}'>")
     back = f"/case/{escape(str(case.get('id', '')))}?{escape(urlencode(keep))}"
     body = (_bar(SETTINGS.policy.business_name, "Check before it goes")
             + "<div class=wrap><section class=hero><span class=state><i></i>Are you sure?</span>"

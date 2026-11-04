@@ -186,9 +186,10 @@ def if_bar(case: dict) -> str:
 
 
 def barred_note(case: dict) -> str:
-    """What a blocked person hears. Plain and final, without saying they're blocked or inviting a back-and-forth."""
+    """What a blocked person hears. Polite and final: a real reason, no invitation to argue, and no mention of the block."""
     name = case.get("customer_name") or "there"
-    return f"Hi {name}, we're not able to help with this request."
+    return (f"Hi {name}, we can't process this request. Refunds and order changes are only handled by our team "
+            "directly, never approved through this chat, and only go back to the original payment method.")
 
 
 def customer_note(case: dict) -> str:
