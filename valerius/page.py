@@ -151,6 +151,7 @@ margin:-100px auto 40px;padding:0 16px}body.v main{padding-bottom:110px}}
 .v .colR .panel{order:6}.v .colL .late,.v .colL .note{order:0}
 body.v.case .wrap{display:flex;flex-direction:column}
 @media (min-width:1000px){body.v.case main{max-width:1040px}
+body.v.rcpt main{max-width:720px}
 body.v.case .wrap{display:grid;grid-template-columns:1.05fr 1fr;gap:16px;align-items:start}
 body.v.case .colL,body.v.case .colR{display:block}body.v.case .colR .chat{margin-top:-6px}
 body.v.case .dock{max-width:1040px;margin:-96px auto 40px}body.v.case .dock .actions{max-width:none;margin:0;width:calc(51.2% - 8px)}
@@ -629,7 +630,8 @@ def shop_status(case: dict, token: dict[str, str], holding: str) -> str:
     body = (_storebar() + "<div class=wrap>" + stamp + "<div class=thread>"
             f"<div class=me>{escape(said[:600])}</div>"
             f"<div class=them>{label}{escape(reply)}</div>{typing}</div>"
-            + ("" if final else "<p class=wait><i></i>This page updates on its own.</p>")
+            + ("" if final else "<p class=wait><i></i>This page updates on its own. You can close it and come back with "
+               "this same link; it works for 7 days.</p>")
             + "<p class=powered>Replies come from the store. Checked by Valerius.</p></div>")
     html = _shell(SETTINGS.policy.business_name, body).replace("</style>", "</style>" + SHOP_CSS, 1)
     return html.replace("<body>", "<body class=shop>", 1).replace("<head>", "<head>" + refresh, 1)
@@ -731,7 +733,7 @@ def receipt_page(case: dict, receipt: dict | None) -> str:
             + (f" #{escape(str(seq))}" if receipt else "") + "</b><span class=sub>Locked into your history</span></div>"
             + f"{chain}</div></section><div class=panel>{proof}</div></div>"
             "<p class=foot>Saved with a receipt. You can close this page.</p>")
-    return _shell("Valerius receipt", body, look="v")
+    return _shell("Valerius receipt", body, look="'v rcpt'")
 
 
 def result_page(title: str, detail: str) -> str:
@@ -846,10 +848,10 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
         main = (f"<h1 class=big>{escape(headline)}</h1>{waiting_html}{done_html}")
     body = (_bar(SETTINGS.policy.business_name, state)
             + f"<div class=wrap>{tabs}{main}<div class=panel>{folds}</div></div>"
-            "<p class=foot>Updates every 30 seconds.</p>")
+            "<p class=foot>Updates every 15 seconds.</p>")
     html = _shell("Valerius", body, look="'v wide'")
     return html.replace("<meta name=robots content=noindex>",
-                        "<meta name=robots content=noindex><meta http-equiv=refresh content=30>"
+                        "<meta name=robots content=noindex><meta http-equiv=refresh content=15>"
                         "<meta name=apple-mobile-web-app-capable content=yes>", 1)
 
 
