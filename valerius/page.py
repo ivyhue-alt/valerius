@@ -86,7 +86,81 @@ label{display:block;font-size:.9rem;color:var(--soft);margin:16px 0 6px}
 .receipt{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;overflow-wrap:anywhere;color:var(--soft)}
 .foot{margin-top:30px;font-size:.82rem;color:var(--faint)}
 .chip{font-size:.8rem;font-weight:600}.r-hold{color:var(--stop)}.r-warn{color:var(--warn)}.r-clear{color:var(--go)}
+/* ---- the Valerius look */
+:root{--brand:#15172b;--brand-ink:#f5f3ff;--accent:#5b4bdb;--amber:#f5b83d;--amber-bg:#fff6e0;--stop-bg:#fdecea;--go-bg:#e8f5ee;
+--bubble:#eef0f6;--card:#fff;--shadow:0 1px 2px rgba(21,23,43,.06),0 8px 24px rgba(21,23,43,.06)}
+@media (prefers-color-scheme:dark){:root{--brand:#0f1020;--card:#12151d;--bubble:#1b2030;--amber-bg:#2e2508;--stop-bg:#2c1414;
+--go-bg:#0f2a1c;--shadow:none}}
+body.v{background:var(--fill)}
+body.v main{padding:0 0 120px}
+.bar{background:var(--brand);color:var(--brand-ink);padding:14px 20px 18px;display:flex;justify-content:space-between;align-items:center;
+font-size:.85rem}
+.bar .mark{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.01em;font-size:.95rem}
+.bar .mark svg{flex:none}.bar .when{opacity:.7}
+.wrap{padding:0 16px}
+.hero{background:var(--card);border-radius:20px;padding:18px 18px 16px;margin:-6px 0 12px;box-shadow:var(--shadow);position:relative}
+.state{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+color:#8a5a00;background:var(--amber-bg);padding:5px 10px;border-radius:999px;margin-bottom:14px}
+.state i{width:7px;height:7px;border-radius:50%;background:var(--amber)}
+.hero .who{margin-bottom:10px}
+.hero .amount{font-size:3.1rem;margin:6px 0 2px}
+.flags{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0;list-style:none}
+.flags li{background:var(--stop-bg);color:var(--stop);font-size:.9rem;font-weight:600;padding:7px 11px;border-radius:10px;
+display:flex;gap:6px;align-items:flex-start;line-height:1.3}
+.flags li::before{content:"!";flex:none;width:17px;height:17px;border-radius:50%;background:var(--stop);color:#fff;font-size:.72rem;
+display:grid;place-items:center;margin-top:1px}
+.flags.calm li{background:var(--fill);color:var(--ink)}.flags.calm li::before{background:var(--soft)}
+.chat{background:var(--card);border-radius:20px;padding:14px 16px 16px;margin:0 0 12px;box-shadow:var(--shadow)}
+.chat small{display:block;color:var(--soft);font-size:.8rem;margin:0 0 8px}
+.bubble{background:var(--bubble);border-radius:18px 18px 18px 6px;padding:11px 14px;font-size:1rem;line-height:1.45;
+overflow-wrap:anywhere;max-width:92%}
+.outcomes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px}
+.outcome{border-radius:16px;padding:12px 13px;font-size:.88rem;line-height:1.4;background:var(--card);box-shadow:var(--shadow)}
+.outcome b{display:block;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+.outcome.y b{color:var(--go)}.outcome.n b{color:var(--soft)}
+.outcome .if{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.pill{background:var(--card);box-shadow:var(--shadow);border-radius:999px;padding:6px 12px;font-size:.85rem;color:var(--soft)}
+.pill b{color:var(--stop)}
+.panel{background:var(--card);border-radius:20px;padding:2px 16px;box-shadow:var(--shadow);margin:12px 0 0}
+.panel details{border-top:0;border-bottom:1px solid var(--line)}.panel details:last-of-type{border-bottom:0}
+.dock{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -8px 24px rgba(21,23,43,.08)}
+.dock .actions{grid-template-columns:1.4fr 1fr;margin:0;max-width:488px;margin:0 auto}
+.dock .btn{padding:15px 10px;font-size:1rem}
+.dock .yes{background:var(--brand);color:var(--brand-ink)}
+@media (prefers-color-scheme:dark){.dock .yes{background:var(--brand-ink);color:var(--brand)}}
+.dock .no{color:var(--ink)}
+.dock .meta{max-width:488px;margin:8px auto 0}
+.v .foot{text-align:center;padding:0 16px}
+.v .late{background:var(--amber-bg);border-radius:14px;padding:10px 12px;color:#8a5a00;margin:0 0 12px}
+@media (min-width:720px){body.v main{max-width:560px;margin:0 auto}.bar{border-radius:0 0 20px 20px}}
+/* receipt */
+.ticket{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin:-6px 0 12px;position:relative;overflow:hidden}
+.ticket .tp{padding:22px 18px 18px}.ticket .bt{padding:16px 18px 18px;border-top:2px dashed var(--line)}
+.ticket::before,.ticket::after{content:"";position:absolute;width:22px;height:22px;border-radius:50%;background:var(--fill);top:var(--cut)}
+.ticket::before{left:-11px}.ticket::after{right:-11px}
+.seal{display:flex;align-items:center;gap:12px}.seal .n{font-weight:700;font-variant-numeric:tabular-nums}
+.chain{display:flex;align-items:center;gap:6px;margin:12px 0 0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;
+color:var(--soft)}.chain span{background:var(--fill);border-radius:6px;padding:3px 6px}.chain span.me{background:var(--brand);color:var(--brand-ink)}
+.v .done{width:52px;height:52px;margin:0 0 14px}
+.v .done.ok{background:var(--go-bg);color:var(--go)}.v .done.bad{background:var(--stop-bg);color:var(--stop)}
+/* dashboard */
+.v .list{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:0 16px;margin:10px 0 0}
+.v .list li:last-child a,.v .list li:last-child .row{border-bottom:0}
+.v .list li{position:relative}
+.v .list li.urgent::before{content:"";position:absolute;left:-16px;top:14px;bottom:14px;width:4px;border-radius:0 4px 4px 0;background:var(--stop)}
+.v .tabs{margin:14px 0 6px}.v .tabs a.on{background:var(--card);box-shadow:var(--shadow)}
+.v h1.big{font-size:1.7rem;margin:18px 0 4px}
+.v .stat{background:var(--card);box-shadow:var(--shadow)}
+.v .bars,.v .wrap>.lines{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:14px 16px}
+.v .section{margin:22px 4px 0}
+.v .panel .lines li{border-bottom:1px solid var(--line)}.v .panel .lines li:last-child{border-bottom:0}
 """
+
+LOGO = ("<svg width=22 height=22 viewBox='0 0 24 24' aria-hidden=true><path d='M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z' "
+        "fill='#5b4bdb'/><path d='m8 9 4 7 4-7' fill='none' stroke='#fff' stroke-width='2.2' stroke-linecap='round' "
+        "stroke-linejoin='round'/></svg>")
 
 
 def _risk_class(risk: str) -> str:
@@ -136,11 +210,16 @@ def _highlight(text: str, quotes: list[str]) -> str:
     return "".join(out)
 
 
-def _shell(title: str, body: str, after: str = "") -> str:
+def _shell(title: str, body: str, after: str = "", look: str = "") -> str:
     return (f"<!doctype html><html lang=en><head><meta charset=utf-8>"
             f"<meta name=viewport content='width=device-width,initial-scale=1,viewport-fit=cover'>"
             f"<meta name=robots content=noindex><title>{escape(title)}</title>"
-            f"<style>{CSS}</style></head><body><main>{body}</main>{after}</body></html>")
+            f"<style>{CSS}</style></head><body{' class=' + look if look else ''}><main>{body}</main>{after}</body></html>")
+
+
+def _bar(left: str, right: str = "") -> str:
+    return (f"<div class=bar><span class=mark>{LOGO}{escape(left)}</span>"
+            f"<span class=when>{right}</span></div>")
 
 
 
@@ -166,7 +245,8 @@ def _ago(ts, now: int | None = None) -> str:
 def _date(ts) -> str:
     import datetime as _dt
     try:
-        return _dt.datetime.fromtimestamp(int(ts), _dt.timezone.utc).strftime("%b %-d, %Y")
+        d = _dt.datetime.fromtimestamp(int(ts), _dt.timezone.utc)
+        return f"{d:%b} {d.day}, {d.year}"          # %-d isn't supported on Windows
     except (TypeError, ValueError, OSError):
         return ""
 
@@ -304,20 +384,28 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
     # ---- first screen
     if business:
         order = (case.get("order") or {}).get("order_id", "")
-        head = (f"<div class=who><div class=av>{_initial(case)}</div><div><div class=name>{escape(voice.who(case))}</div>"
+        who = escape(voice.who(case))
+        flags = "".join(f"<li>{escape(r[:1].upper() + r[1:])}</li>" for r in reasons) or \
+            "<li>Your rules say you decide this one</li>"
+        head = ("<section class=hero>"
+                + ("<span class=state><i></i>Needs you</span>" if held else "")
+                + f"<div class=who><div class=av>{_initial(case)}</div><div><div class=name>{who}</div>"
                 + (f"<div class=sub>Order {escape(order)}</div>" if order else "") + "</div></div>"
                 + (f"<div class=amount>${float(amt):,.0f}</div>" if amt is not None else "")
-                + f"<div class=sub>{escape(_what(case))}</div>")
+                + f"<div class=sub>{escape(_what(case))}</div>"
+                + f"<ul class=flags aria-label='Why it waited for you'>{flags}</ul></section>")
         said = case.get("text", "").strip()
         if said:
             short = said if len(said) <= 240 else said[:237].rsplit(" ", 1)[0] + "..."
-            head += f"<p class=said><small>In their words</small>&ldquo;{_highlight(short, quotes)}&rdquo;</p>"
-        head += f"<p class=why>{escape(why)}</p>"
+            head += (f"<section class=chat><small>In their words, to your agent</small>"
+                     f"<div class=bubble>{_highlight(short, quotes)}</div></section>")
         if claims:
-            head += f"<p class=note><span class=flag>{_ordinal(len(claims) + 1)} claim</span> in two years.</p>"
+            head += f"<div class=pills><span class=pill><b>{_ordinal(len(claims) + 1)} claim</b> in two years</span></div>"
         if held:
-            head += f"<p class=note>If you say yes, {escape(voice.if_yes(case, fee))}</p>"
-            head += f"<p class=note>If you say no, {escape(voice.if_no(case))}</p>"
+            yes_text, no_text = voice.if_yes(case, fee), voice.if_no(case)
+            head += ("<div class=outcomes>"
+                     f"<div class='outcome y'><b>If you say yes</b>{escape(yes_text[:1].upper() + yes_text[1:])}</div>"
+                     f"<div class='outcome n'><b>If you say no</b>{escape(no_text[:1].upper() + no_text[1:])}</div></div>")
     else:
         head = (f"<h1>This looks like a scam.</h1>{_evidence_image(case).split('<p class=')[0]}"
                 f"<p class=why>{escape(why)}</p>"
@@ -383,18 +471,24 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
             folds.append(f"<details><summary>Something feels off?</summary><div class=inner><p class=note>Pause your agent and "
                          f"everything it asks for waits for you.</p><form method=post action='/agent/{path}'>{hidden}"
                          f"<button class='btn no'>{verb}</button></form></div></details>")
+    late = ""
     if case.get("paused_agent"):
-        head = "<p class='note flag'>Your agent is paused, so everything waits for you.</p>" + head
+        late += "<p class='note flag'>Your agent is paused, so everything waits for you.</p>"
     if business and case.get("after_hours"):
         from . import hours
         t = hours.local(case.get("created_at", now))
         at = f"{t.hour % 12 or 12}:{t.minute:02d} {'AM' if t.hour < 12 else 'PM'}"
-        head = (f"<p class=late>Came in at {at}, while you were closed. {escape(voice.who(case))} was told "
-                "you'd look at it when you open.</p>") + head
+        late += (f"<p class=late>Came in at {at}, while you were closed. {escape(voice.who(case))} was told "
+                 "you'd look at it when you open.</p>")
 
-    brand = SETTINGS.policy.business_name if business else "Valerius"
-    body = (f"<div class=top><b>{escape(brand)}</b><span>{escape(_ago(case.get('created_at'), now))}</span></div>"
-            f"{head}{actions}<div style='margin-top:26px'>{''.join(folds)}</div>"
+    if business:
+        dock = f"<div class=dock>{actions}</div>" if actions else ""
+        body = (_bar(SETTINGS.policy.business_name, escape(_ago(case.get('created_at'), now)))
+                + f"<div class=wrap>{late}{head}<div class=panel>{''.join(folds)}</div></div>"
+                "<p class=foot>Valerius checks. You decide.</p>")
+        return _shell("Valerius", body, after=dock, look="v")
+    body = (f"<div class=top><b>Valerius</b><span>{escape(_ago(case.get('created_at'), now))}</span></div>"
+            f"{late}{head}{actions}<div style='margin-top:26px'>{''.join(folds)}</div>"
             "<p class=foot>Valerius checks. You decide.</p>")
     return _shell("Valerius", body)
 
@@ -425,16 +519,32 @@ def receipt_page(case: dict, receipt: dict | None) -> str:
     result = result[:1].upper() + result[1:]
     got = (f"<div class=label>What {escape(voice.who(case))} got</div><div class=msg>{escape(case['customer_note'])}</div>"
            if business and case.get("customer_note") else "")
+    seq = receipt.get("seq") if receipt else None
+    h = str(receipt.get("hash", "")) if receipt else ""
     proof = ""
     if receipt:
-        proof = (f"<details><summary>Proof</summary><div class=inner><p class=note>This is receipt {escape(str(receipt.get('seq', '')))}. "
+        proof = (f"<details><summary>Proof</summary><div class=inner><p class=note>This is receipt {escape(str(seq))}. "
                  "Each receipt locks in the one before it, so nobody can quietly change the history.</p>"
-                 f"<p class=receipt>{escape(str(receipt.get('hash', '')))}</p></div></details>")
-    body = (f"<div class=top><b>Valerius</b><span>{escape(_date(_time.time()))}</span></div>"
-            f"<div class=done>{'&#10003;' if status == 'approved' else '&#10005;'}</div>"
-            f"<h1>Done. You chose: {escape(title)}.</h1><p class=note>{escape(result)}</p>{got}"
-            f"<div style='margin-top:26px'>{proof}</div><p class=foot>Saved with a receipt. You can close this page.</p>")
-    return _shell("Valerius receipt", body)
+                 f"<p class=receipt>{escape(h)}</p></div></details>")
+    ok = status == "approved"
+    mark = f"<div class='done {'ok' if ok else 'bad'}'>{'&#10003;' if ok else '&#10005;'}</div>"
+    if not business:
+        body = (f"<div class=top><b>Valerius</b><span>{escape(_date(_time.time()))}</span></div>"
+                f"{mark}<h1>Done. You chose: {escape(title)}.</h1><p class=note>{escape(result)}</p>{got}"
+                f"<div style='margin-top:26px'>{proof}</div><p class=foot>Saved with a receipt. You can close this page.</p>")
+        return _shell("Valerius receipt", body)
+    chain = ""
+    if receipt and isinstance(seq, int) and seq > 1:
+        chain = (f"<div class=chain aria-label='Receipt chain'><span>#{seq - 1}</span>&rarr;"
+                 f"<span class=me>#{seq} &middot; {escape(h[:8])}</span></div>")
+    body = (_bar(SETTINGS.policy.business_name, escape(_date(_time.time())))
+            + "<div class=wrap><section class=ticket style='--cut:calc(100% - 118px)'><div class=tp>"
+            f"{mark}<h1>Done. You chose: {escape(title)}.</h1><p class=note>{escape(result)}</p>{got}</div>"
+            "<div class=bt><div class=seal><b class=n>Receipt"
+            + (f" #{escape(str(seq))}" if receipt else "") + "</b><span class=sub>Locked into your history</span></div>"
+            + f"{chain}</div></section><div class=panel>{proof}</div></div>"
+            "<p class=foot>Saved with a receipt. You can close this page.</p>")
+    return _shell("Valerius receipt", body, look="v")
 
 
 def result_page(title: str, detail: str) -> str:
@@ -524,11 +634,11 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
     if view == "insights":
         main = insights_view(all_cases)
     else:
-        main = (f"<h1>{escape(headline)}</h1>{waiting_html}{done_html}")
-    body = (f"<div class=top><b>{escape(SETTINGS.policy.business_name)}</b>{state}</div>{tabs}"
-            f"{main}<div style='margin-top:30px'>{folds}</div>"
+        main = (f"<h1 class=big>{escape(headline)}</h1>{waiting_html}{done_html}")
+    body = (_bar(SETTINGS.policy.business_name, state)
+            + f"<div class=wrap>{tabs}{main}<div class=panel>{folds}</div></div>"
             "<p class=foot>Updates every 30 seconds.</p>")
-    html = _shell("Valerius", body)
+    html = _shell("Valerius", body, look="v")
     return html.replace("<meta name=robots content=noindex>",
                         "<meta name=robots content=noindex><meta http-equiv=refresh content=30>"
                         "<meta name=apple-mobile-web-app-capable content=yes>", 1)
