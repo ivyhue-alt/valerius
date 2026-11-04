@@ -99,3 +99,55 @@ def build(cases: list[dict], days: int = 30, now: int | None = None) -> dict:
     for k in ("refunded_usd", "kept_usd", "fees_usd"):
         out[k] = round(out[k], 2)
     return out
+
+
+
+def _refund_paid(c: dict) -> float:
+    """Money that actually went back: refunds the agent did alone or the owner approved."""
+    if c.get("requested_action") == "refund" and c.get("status") in ("allowed", "approved") and c.get("amount_usd"):
+        return float(c["amount_usd"])
+    return 0.0
+
+
+def periods(cases: list[dict], now: int | None = None) -> list[dict]:
+    """Today, week to date (from Monday) and month to date, in the store's own time zone."""
+    from datetime import timedelta
+    from . import hours
+    now = now or int(time.time())
+    t = hours.local(now)
+    midnight = t.replace(hour=0, minute=0, second=0, microsecond=0)
+    starts = [("Today", midnight), ("This week", midnight - timedelta(days=t.weekday())),
+              ("This month", midnight.replace(day=1))]
+    biz = [c for c in cases if c.get("channel") == "business"]
+    out = []
+    for label, start in starts:
+        since = int(start.timestamp())
+        rows = [c for c in biz if since <= int(c.get("created_at", 0)) <= now]
+        paid = [c for c in rows if _refund_paid(c)]
+        kept = sum(float(c.get("amount_usd") or 0) for c in rows
+                   if c.get("requested_action") == "refund" and c.get("status") in ("blocked", "refused"))
+        out.append({"label": label, "refunded_usd": round(sum(_refund_paid(c) for c in paid), 2), "refunds": len(paid),
+                    "kept_usd": round(kept, 2), "waited": sum(1 for c in rows if c.get("status") == "held"),
+                    "requests": len(rows)})
+    return out
+
+
+def trends(cases: list[dict], now: int | None = None) -> list[dict]:
+    """What customers bring up more this week than the week before, from their own words."""
+    now = now or int(time.time())
+    week = 7 * 86400
+
+    def count(lo: int, hi: int) -> Counter:
+        c = Counter()
+        for x in cases:
+            if x.get("channel") != "business" or not (lo <= int(x.get("created_at", 0)) < hi):
+                continue
+            if x.get("requested_action") not in RETURN_ACTIONS or {f.get("rule") for f in x.get("findings", [])} & FRAUD_RULES:
+                continue
+            c[reason_of(x.get("text", ""))] += 1
+        return c
+
+    this, last = count(now - week, now + 1), count(now - 2 * week, now - week)
+    rising = [{"reason": r, "now": n, "before": last.get(r, 0)} for r, n in this.most_common()
+              if r != "Other or not said" and n >= 2 and n > last.get(r, 0)]
+    return rising[:3]

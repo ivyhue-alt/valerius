@@ -182,14 +182,17 @@ def bar_button(case: dict) -> str:
 def if_bar(case: dict) -> str:
     name = who(case)
     return (f"the request is denied, and {name} can't get refunds, replacements or account changes through your agent "
-            "until you unblock them. They aren't told they're blocked.")
+            "until you unblock them. They're told why, in the chat, and how to contest it.")
 
 
 def barred_note(case: dict) -> str:
-    """What a blocked person hears. Polite and final: a real reason, no invitation to argue, and no mention of the block."""
+    """What a blocked person hears, in the chat: the decision, the reason, what it means, and how to contest it."""
+    from .config import SETTINGS
+    p = SETTINGS.policy
     name = case.get("customer_name") or "there"
-    return (f"Hi {name}, we can't process this request. Refunds and order changes are only handled by our team "
-            "directly, never approved through this chat, and only go back to the original payment method.")
+    return (f"Hi {name}, we're not able to issue this refund. This request broke our store policy because it claimed to "
+            f"come from our owner or staff, so this account can no longer request refunds or order changes through "
+            f"this chat. If you think this is a mistake, email us at {p.contact_email}.\n\n{p.business_name}")
 
 
 def customer_note(case: dict) -> str:
@@ -243,3 +246,13 @@ def done(case: dict) -> str:
     yes, no = buttons(case)
     said = yes if case.get("status") == "approved" else bar_button(case) if case.get("barred_person") else no
     return f"You chose: {said}."
+
+
+
+def refused_note(case: dict) -> str:
+    """Later requests from someone the owner blocked: same answer every time, with the way to contest it."""
+    from .config import SETTINGS
+    p = SETTINGS.policy
+    name = case.get("customer_name") or "there"
+    return (f"Hi {name}, refunds and order changes for this account can't be handled through this chat. If you think "
+            f"this is a mistake, email us at {p.contact_email}.\n\n{p.business_name}")

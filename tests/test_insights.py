@@ -73,3 +73,18 @@ class SameName(unittest.TestCase):
         d = insights.build(rows, now=NOW)
         self.assertEqual(sorted(r["who"] for r in d["repeat"]), ["Dana (ending 1111)", "Dana (ending 2222)"])
         self.assertEqual([r["count"] for r in d["repeat"]], [2, 2])
+
+
+class Periods(unittest.TestCase):
+    def test_today_week_month(self):
+        rows = [case("approved", "mug arrived broken", 20, ago=0), case("allowed", "cake squished", 15, ago=0),
+                case("blocked", "too many", 100, ago=0), case("approved", "old one", 40, ago=40)]
+        today, week, month = insights.periods(rows, now=NOW)
+        self.assertEqual((today["refunded_usd"], today["refunds"], today["kept_usd"]), (35.0, 2, 100.0))
+        self.assertGreaterEqual(month["refunded_usd"], today["refunded_usd"])
+        self.assertNotIn(40.0, [today["refunded_usd"], week["refunded_usd"]])
+
+    def test_rising_reasons(self):
+        rows = [case("allowed", "arrived broken", 10, ago=1), case("allowed", "cracked mug", 10, ago=2),
+                case("allowed", "smashed box", 10, ago=9)]
+        self.assertEqual(insights.trends(rows, now=NOW)[0], {"reason": "Arrived damaged", "now": 2, "before": 1})

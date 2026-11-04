@@ -37,6 +37,7 @@ def _env(name: str, default: str = "") -> str:
 class PolicyCard:
     """What the business owner lets the agent do alone. Shown on every approval page."""
     business_name: str = "Rosewood Bakery"   # fictional demo business
+    contact_email: str = "help@rosewoodbakery.example"   # where a blocked customer can contest it (fictional)
     refund_limit_usd: float = 50.0           # per item, for refunds and reships
     order_limit_usd: float = 150.0           # total per request
     max_claims: int = 2                      # refund/reship claims per customer before the owner decides
@@ -59,8 +60,8 @@ class PolicyCard:
             f"A customer's claim number {self.max_claims + 1} or more within {self.claim_window_days} days: owner decides.",
             f"Cancel before the payment is taken (or within {self.free_cancel_minutes} minutes if that's unknown) and before shipping: agent may do it, any time of day.",
             "Damage claims without a photo, later cancellations, payment changes and account changes: owner approves.",
-            *(["Someone who pretends to be you or your staff: you can deny it and block them. A blocked person's refunds, "
-               "replacements and account changes are refused until you unblock them."] if self.offer_block else []),
+            *(["Someone who pretends to be you or your staff: you can deny it and block them. They're told why and how to "
+               "contest it, and their refunds, replacements and account changes are refused until you unblock them."] if self.offer_block else []),
             (f"Outside {self._hour(self.open_hour)} to {self._hour(self.close_hour)}, holds wait quietly and you get one "
              f"summary when you open." if self.after_hours == "queue" else
              f"Outside {self._hour(self.open_hour)} to {self._hour(self.close_hour)}, you still get a message right away."),

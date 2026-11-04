@@ -263,7 +263,7 @@ def open_case(result: Result, store: Store, now: int | None = None) -> dict:
     if barred:
         from . import voice
         case["barred"] = True
-        case["customer_note"] = voice.barred_note(case)
+        case["customer_note"] = voice.refused_note(case)
     if hold:
         tok = sign(case["id"], "decide")
         case["link"] = link(tok)

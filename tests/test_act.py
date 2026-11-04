@@ -370,7 +370,9 @@ class BlockPeople(Base):
         ok, _ = act.decide(fake["id"], act.sign(fake["id"], "decide"), "bar", self.store)
         self.assertTrue(ok)
         done = self.store.load_case(fake["id"])
-        self.assertTrue(done["customer_note"].startswith("Hi Marcus, we can't process this request."))
+        self.assertTrue(done["customer_note"].startswith("Hi Marcus, we're not able to issue this refund."))
+        self.assertIn("broke our store policy", done["customer_note"])
+        self.assertIn("If you think this is a mistake", done["customer_note"])
         self.assertNotIn("reply here", done["customer_note"])
         self.assertTrue(any(r.get("blocked_person") for r in self.store.receipts()))
         receipt = page.receipt_page(done, act.last_receipt(self.store, fake["id"]))
@@ -381,7 +383,7 @@ class BlockPeople(Base):
                             requested_action="refund", amount_usd=12, customer_id="C-marcus", customer_name="Marcus",
                             order=OrderRecord(delivered=True, photo_provided=True))), self.store)
         self.assertEqual(nxt["status"], "refused")
-        self.assertNotIn("blocked", nxt["customer_note"].lower())
+        self.assertIn("If you think this is a mistake", nxt["customer_note"])
         dash = page.owner_dashboard([nxt], {}, {}, None, False, barred=self.store.barred(), unbar_token=act.unbar_token())
         self.assertIn("People you blocked (1)", dash)
         self.assertIn("Refused (blocked)", dash)
@@ -468,7 +470,7 @@ class BlockReply(Server):
         status, html = self.post(f"/case/{fake['id']}/decide", urllib.parse.urlencode(form).encode())
         self.assertEqual(status, 200)
         note = self.store.load_case(fake["id"])["customer_note"]
-        self.assertIn("we can't process this request", note)
+        self.assertIn("broke our store policy", note)
         self.assertNotIn("talk it through", note)
 
     def test_owner_can_edit_the_block_reply(self):

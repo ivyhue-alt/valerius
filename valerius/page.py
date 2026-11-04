@@ -146,6 +146,15 @@ label.check input{width:20px;height:20px;accent-color:var(--brand)}
 @media (min-width:720px){body.v main{max-width:560px;margin:0 auto}.appbar{border-radius:0 0 20px 20px}}
 @media (min-width:720px){.dock{position:static;background:transparent;border:0;box-shadow:none;max-width:560px;
 margin:-100px auto 40px;padding:0 16px}body.v main{padding-bottom:110px}}
+.v .colL,.v .colR{display:contents}
+.v .colL .hero{order:1}.v .colR .chat{order:2}.v .colL .pills{order:3}.v .colL .outcomes{order:4}.v .colL .outcome.b{order:5}
+.v .colR .panel{order:6}.v .colL .late,.v .colL .note{order:0}
+body.v.case .wrap{display:flex;flex-direction:column}
+@media (min-width:1000px){body.v.case main{max-width:1040px}
+body.v.case .wrap{display:grid;grid-template-columns:1.05fr 1fr;gap:16px;align-items:start}
+body.v.case .colL,body.v.case .colR{display:block}body.v.case .colR .chat{margin-top:-6px}
+body.v.case .dock{max-width:1040px;margin:-96px auto 40px}body.v.case .dock .actions{max-width:none;margin:0;width:calc(51.2% - 8px)}
+body.v.case .dock .meta{max-width:none;width:calc(51.2% - 8px);margin-left:0}}
 @media (min-width:1000px){body.v.wide main{max-width:900px}body.v.wide .stats{grid-template-columns:repeat(4,1fr)}}
 /* receipt */
 .ticket{background:var(--card);border-radius:20px;box-shadow:var(--shadow);margin:-6px 0 12px;position:relative;overflow:hidden}
@@ -165,6 +174,9 @@ color:var(--soft)}.chain span{background:var(--fill);border-radius:6px;padding:3
 .v .tabs{margin:14px 0 6px}.v .tabs a.on{background:var(--card);box-shadow:var(--shadow)}
 .v h1.big{font-size:1.7rem;margin:18px 0 4px}
 .v .stat{background:var(--card);box-shadow:var(--shadow)}
+.periods{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 0}
+.periods .stat span:first-child{display:block;font-weight:600;color:var(--ink);margin-bottom:2px}
+@media (max-width:480px){.periods{grid-template-columns:1fr}}
 .v .bars,.v .wrap>.lines{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:14px 16px}
 .v .section{margin:22px 4px 0}
 .v .panel .lines li{border-bottom:1px solid var(--line)}.v .panel .lines li:last-child{border-bottom:0}
@@ -394,6 +406,7 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
     claims = [h for h in (history or []) if h.get("is_claim")]
 
     # ---- first screen
+    chat_html = ""
     if business:
         order = (case.get("order") or {}).get("order_id", "")
         who = escape(voice.who(case))
@@ -409,8 +422,8 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
         said = case.get("text", "").strip()
         if said:
             short = said if len(said) <= 240 else said[:237].rsplit(" ", 1)[0] + "..."
-            head += (f"<section class=chat><small>In their words, to your agent</small>"
-                     f"<div class=bubble>{_highlight(short, quotes)}</div></section>")
+            chat_html = (f"<section class=chat><small>In their words, to your agent</small>"
+                         f"<div class=bubble>{_highlight(short, quotes)}</div></section>")
         if claims:
             head += f"<div class=pills><span class=pill><b>{_ordinal(len(claims) + 1)} claim</b> in two years</span></div>"
         if held:
@@ -508,9 +521,10 @@ def approval_page(case: dict, token: dict[str, str], record: dict[str, int],
     if business:
         dock = f"<div class=dock>{actions}</div>" if actions else ""
         body = (_bar(SETTINGS.policy.business_name, escape(_ago(case.get('created_at'), now)))
-                + f"<div class=wrap>{late}{head}<div class=panel>{''.join(folds)}</div></div>"
+                + f"<div class=wrap><div class=colL>{late}{head}</div>"
+                  f"<div class=colR>{chat_html}<div class=panel>{''.join(folds)}</div></div></div>"
                 "<p class=foot>Valerius checks. You decide.</p>")
-        return _shell("Valerius", body, after=dock, look="v")
+        return _shell("Valerius", body, after=dock, look="'v case'")
     body = (f"<div class=top><b>Valerius</b><span>{escape(_ago(case.get('created_at'), now))}</span></div>"
             f"{late}{head}{actions}<div style='margin-top:26px'>{''.join(folds)}</div>"
             "<p class=foot>Valerius checks. You decide.</p>")
@@ -819,7 +833,7 @@ def owner_dashboard(cases: list[dict], record: dict[str, int], review_links: dic
                            "<button class='btn no small'>Unblock</button></form>" if unbar_token else "") + "</li>")
         folds += (f"<details><summary>People you blocked ({len(barred)})</summary><div class=inner><p class=note>They "
                   "pretended to be you or your staff. Their refunds, replacements and account changes are refused, "
-                  f"and they aren't told why.</p><ul class=lines>{''.join(rows)}</ul></div></details>")
+                  f"and they're told how to contest it.</p><ul class=lines>{''.join(rows)}</ul></div></details>")
     state = ("<span><span class='dot off'></span>Agent paused</span>" if agent_paused else
              "<span><span class=dot></span>Agent on</span>")
     q = escape(tab_query)
@@ -858,6 +872,17 @@ def insights_view(cases: list[dict]) -> str:
             f"<div class=stat><b>{d['returns']}</b><span>returns and replacements asked for</span></div></div>"
             + (f"<p class=note><span class=flag>{d['fraud']} looked like fraud</span> (someone posing as staff, or trying "
                "to trick your agent). They're left out of the return reasons below.</p>" if d["fraud"] else ""))
+    per = insights.periods(cases)
+    html += ("<div class=section>Refunds so far</div><div class=periods>" + "".join(
+        f"<div class=stat><span>{escape(x['label'])}</span><b>{money(x['refunded_usd'])}</b>"
+        f"<span>{x['refunds']} refund{'s' if x['refunds'] != 1 else ''}"
+        + (f" &middot; {money(x['kept_usd'])} kept" if x["kept_usd"] else "")
+        + (f" &middot; {x['waited']} waiting" if x["waited"] else "") + "</span></div>" for x in per) + "</div>")
+    rising = insights.trends(cases)
+    if rising:
+        html += ("<div class=section>Coming up more this week</div><ul class=lines>" + "".join(
+            f"<li><b>{escape(r['reason'])}</b>: {r['now']} this week, {r['before']} the week before</li>" for r in rising)
+            + "</ul>")
     if d["reasons"]:
         html += "<div class=section>Why things come back</div><ul class=bars>" + "".join(
             f"<li><div class=top2><span>{escape(r['reason'])}</span><span>{r['count']}</span></div>"
