@@ -50,6 +50,7 @@ class PolicyCard:
     open_hour: int = 9                       # business hours, local time; holds outside them wait for opening
     close_hour: int = 21
     after_hours: str = "queue"               # "queue": one summary at opening; "notify": ping the owner anyway
+    chat_theme: str = "bakery"               # little touches on the customer's page: "bakery" (cookies) or "plain"
     offer_block: bool = True                 # owner opted in: when someone poses as the owner or staff, offer to block them
 
     def lines(self) -> list[str]:

@@ -539,6 +539,15 @@ body.shop{background:#faf7f2}.shop main{padding:0 0 40px}
 .shop .stamp{display:inline-block;font-weight:700;font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;
 border-radius:999px;margin:0 0 10px}.shop .stamp.ok{background:#e8f5ee;color:#16794a}.shop .stamp.no{background:#f4efe8;color:#5c4f43}
 .shop .powered{text-align:center;color:#b3a594;font-size:.78rem;margin-top:22px}
+.shop .typing{align-self:flex-start;display:inline-flex;gap:6px;align-items:center;background:#fff;border-radius:18px;border-bottom-left-radius:6px;
+padding:10px 14px;box-shadow:0 1px 2px rgba(60,40,20,.08)}
+.shop .typing svg{animation:hop 1.1s ease-in-out infinite}.shop .typing svg:nth-child(2){animation-delay:.18s}
+.shop .typing svg:nth-child(3){animation-delay:.36s}
+@keyframes hop{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+.shop .from{display:flex;align-items:center;gap:6px}.shop .from svg{flex:none}
+.shop .bite{transform-origin:center;animation:bite .5s .35s ease-out both}
+@keyframes bite{from{r:0}to{r:7}}
+@media (prefers-reduced-motion:reduce){.shop .typing svg,.shop .bite{animation:none}}
 @media (prefers-color-scheme:dark){body.shop{background:#15120f}.shop .storebar,.shop .card,.shop .them{background:#1f1a16;border-color:#2e2620}
 .shop input[type=text],.shop textarea,.shop input[type=password]{background:#15120f;border-color:#2e2620}}
 </style>"""
@@ -570,6 +579,15 @@ def shop_form(error: str = "") -> str:
         .replace("<body>", "<body class=shop>", 1)
 
 
+def _cookie(size: int = 18, bitten: bool = False) -> str:
+    """A small biscuit for the bakery theme. A bite is taken when the store replies."""
+    bite = "<circle class=bite cx='20' cy='4' r='7' fill='#fff'/>" if bitten else ""
+    return (f"<svg width={size} height={size} viewBox='0 0 24 24' aria-hidden=true><circle cx='12' cy='12' r='10' fill='#d9a35b'/>"
+            "<circle cx='12' cy='12' r='10' fill='none' stroke='#b9813f' stroke-width='1.2'/>"
+            "<circle cx='8' cy='9' r='1.5' fill='#5a3518'/><circle cx='14' cy='14' r='1.6' fill='#5a3518'/>"
+            f"<circle cx='9' cy='15.5' r='1.2' fill='#5a3518'/><circle cx='15.5' cy='8.5' r='1.1' fill='#5a3518'/>{bite}</svg>")
+
+
 def shop_status(case: dict, token: dict[str, str], holding: str) -> str:
     """What the customer sees after sending: their message, the store's reply, and the result when it comes."""
     from urllib.parse import urlencode
@@ -590,9 +608,13 @@ def shop_status(case: dict, token: dict[str, str], holding: str) -> str:
     said = (case.get("text") or "").strip()
     refresh = "" if final else (f"<meta http-equiv=refresh content='6;url=/status/{escape(str(case.get('id', '')))}?"
                                 f"{escape(urlencode({k: token.get(k, '') for k in TOKEN_KEYS}))}'>")
+    cookies = SETTINGS.policy.chat_theme == "bakery"
+    who = escape(SETTINGS.policy.business_name)
+    label = f"<small class=from>{_cookie(14, bitten=True)}{who}</small>" if cookies else f"<small>{who}</small>"
+    typing = ("<div class=typing aria-label='The store is typing'>" + _cookie() * 3 + "</div>") if cookies and not final else ""
     body = (_storebar() + "<div class=wrap>" + stamp + "<div class=thread>"
             f"<div class=me>{escape(said[:600])}</div>"
-            f"<div class=them><small>{escape(SETTINGS.policy.business_name)}</small>{escape(reply)}</div></div>"
+            f"<div class=them>{label}{escape(reply)}</div>{typing}</div>"
             + ("" if final else "<p class=wait><i></i>This page updates on its own.</p>")
             + "<p class=powered>Replies come from the store. Checked by Valerius.</p></div>")
     html = _shell(SETTINGS.policy.business_name, body).replace("</style>", "</style>" + SHOP_CSS, 1)
