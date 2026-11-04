@@ -79,14 +79,22 @@ def build(cases: list[dict], days: int = 30, now: int | None = None) -> dict:
             for it in c.get("items") or []:
                 if isinstance(it, dict) and it.get("name"):
                     products[str(it["name"])[:60]] += int(it.get("qty") or 1)
-            who = c.get("customer_name") or c.get("customer_id")
-            if who:
-                claims[str(who)].append(c)
+            key = c.get("customer_id") or c.get("customer_name")     # the person, not their first name
+            if key:
+                claims[str(key)].append(c)
     total = sum(reason_count.values()) or 1
     out["reasons"] = [{"reason": r, "count": n, "share": round(100 * n / total), "quote": reason_quote.get(r, "")}
                       for r, n in reason_count.most_common()]
     out["products"] = [{"name": k, "count": v} for k, v in products.most_common(5)]
-    out["repeat"] = sorted(({"who": k, "count": len(v), "usd": sum(float(x.get("amount_usd") or 0) for x in v)}
+    def label(key: str, rows: list[dict]) -> str:
+        name = next((r.get("customer_name") for r in rows if r.get("customer_name")), "") or "Customer"
+        same = sum(1 for k, v in claims.items() if k != key and
+                   next((r.get("customer_name") for r in v if r.get("customer_name")), "") == name)
+        tail = "".join(ch for ch in key if ch.isalnum())[-4:]
+        # Two people with the same first name are told apart by the end of their number or id.
+        return f"{name} (ending {tail})" if (same or name == "Customer") and len(tail) == 4 else name
+
+    out["repeat"] = sorted(({"who": label(k, v), "count": len(v), "usd": sum(float(x.get("amount_usd") or 0) for x in v)}
                             for k, v in claims.items() if len(v) >= 2), key=lambda x: -x["count"])[:5]
     for k in ("refunded_usd", "kept_usd", "fees_usd"):
         out[k] = round(out[k], 2)

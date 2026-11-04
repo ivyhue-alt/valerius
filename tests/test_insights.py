@@ -62,3 +62,14 @@ class FraudIsNotAReturn(unittest.TestCase):
         d = insights.build(CASES + [fake], now=NOW)
         self.assertEqual(d["fraud"], 1)
         self.assertNotIn("I'm the manager", " ".join(r["quote"] for r in d["reasons"]))
+
+
+class SameName(unittest.TestCase):
+    def test_two_people_called_dana_are_kept_apart(self):
+        rows = [dict(case("approved", "mug arrived broken", 20), customer_id="15550001111", customer_name="Dana"),
+                dict(case("approved", "plate arrived cracked", 30), customer_id="15550001111", customer_name="Dana"),
+                dict(case("approved", "cake squished", 15), customer_id="15559992222", customer_name="Dana"),
+                dict(case("approved", "bread squished", 12), customer_id="15559992222", customer_name="Dana")]
+        d = insights.build(rows, now=NOW)
+        self.assertEqual(sorted(r["who"] for r in d["repeat"]), ["Dana (ending 1111)", "Dana (ending 2222)"])
+        self.assertEqual([r["count"] for r in d["repeat"]], [2, 2])
