@@ -8,7 +8,8 @@ phone number or account ID. Benchmark data uses 555 numbers and fake IDs,
 which are allowed.
 """
 
-from __future__ import annotations
+from __future__ import hashlib
+import annotations
 
 import re
 import subprocess
@@ -34,6 +35,8 @@ PATTERNS = [
     ("Meta numeric ID", re.compile(r"(?<![\d.])\d{15,17}(?![\d.])")),
 ]
 
+# Binary files a person checked frame by frame (no keys, links, codes or real customer data on screen), pinned by hash.
+REVIEWED_BINARIES = {"demo/valerius-demo.mp4": "72e33e96105d77fca70a576dcf35576dca40b2a85068e9fa6e3ee52d62d34723"}
 SKIP_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".ogg", ".mp3", ".wav", ".pdf", ".zip"}
 SELF = "scripts/check_secrets.py"
 
@@ -57,6 +60,8 @@ def scan(files: list[str]) -> list[str]:
         path = ROOT / f
         if not path.is_file():
             continue
+        if REVIEWED_BINARIES.get(f) == hashlib.sha256(path.read_bytes()).hexdigest():
+            continue                     # checked by hand; any change to the file makes it fail again
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
         except UnicodeDecodeError:

@@ -8,6 +8,11 @@ An independent supervisor for AI agents on WhatsApp. **The model can advise. It 
 Built for the Meta Global AI Developer Hackathon (Indie Developer track), Oct 26 to Nov 4, 2026, on the Meta Model API.
 
 
+
+## Demo video
+
+[demo/valerius-demo.mp4](demo/valerius-demo.mp4) (1 min 49 s, captions and an AI-generated narration voice). It shows only what was built during the hackathon: a customer on a phone posing as the owner, the owner deciding on her computer, the receipt, the dashboard and Insights, then the code that calls Meta's models. All customers and orders are made up.
+
 ## Results
 
 Measured once, on 70 locked test conversations (synthetic, hand-labeled, never used while building). The full run is in [`results/final_run.txt`](results/final_run.txt).
