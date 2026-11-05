@@ -11,6 +11,8 @@ Built for the Meta Global AI Developer Hackathon (Indie Developer track), Oct 26
 
 ## Demo video
 
+**Watch it: https://youtu.be/YQBfBoDAzk4**
+
 [demo/valerius-demo.mp4](demo/valerius-demo.mp4) (1 min 49 s, captions and an AI-generated narration voice). It shows only what was built during the hackathon: a customer on a phone posing as the owner, the owner deciding on her computer, the receipt, the dashboard and Insights, then the code that calls Meta's models. All customers and orders are made up.
 
 ## Results
