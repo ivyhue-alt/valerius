@@ -8,8 +8,9 @@ phone number or account ID. Benchmark data uses 555 numbers and fake IDs,
 which are allowed.
 """
 
-from __future__ import hashlib
-import annotations
+from __future__ import annotations
+
+import hashlib
 
 import re
 import subprocess
